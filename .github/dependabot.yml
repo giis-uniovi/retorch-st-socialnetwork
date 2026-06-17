@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: weekly
       day: "friday"
+      time: "00:30"
+      timezone: "Europe/Madrid"
+    rebase-strategy: "disabled"
+    assignees:
+      - "ClaudiodelaRiva"
     open-pull-requests-limit: 20
 
   - package-ecosystem: github-actions
@@ -12,4 +17,9 @@ updates:
     schedule:
       interval: weekly
       day: "friday"
+      time: "00:30"
+      timezone: "Europe/Madrid"
+    rebase-strategy: "disabled"
+    assignees:
+      - "ClaudiodelaRiva"
     open-pull-requests-limit: 20
