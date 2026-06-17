@@ -1,0 +1,12 @@
+target
+reports
+pom.xml.versionsBackup
+TESTS-TestSuites.xml
+
+.classpath
+.project
+.settings
+
+.idea
+# to allow each developer customize sonarlint
+org.sonarlint.eclipse.core.prefs
