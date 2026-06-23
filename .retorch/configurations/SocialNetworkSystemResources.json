@@ -1,0 +1,184 @@
+{
+  "web-browser": {
+    "hierarchyParent": [],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelWebBrowser",
+      "elasticity": 5,
+      "elasticityCost": 30.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "web-browser",
+    "minimalCapacities": [
+      {
+        "name": "memory",
+        "quantity": 0.048
+      },
+      {
+        "name": "processor",
+        "quantity": 0.25
+      },
+      {
+        "name": "storage",
+        "quantity": 0.31
+      }
+    ],
+    "dockerImage": "web-browser;eexit/mirror-http-server"
+  },
+  "frontend": {
+    "hierarchyParent": [],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelFrontend",
+      "elasticity": 4,
+      "elasticityCost": 10.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "frontend",
+    "minimalCapacities": [
+      {
+        "name": "memory",
+        "quantity": 0.048
+      },
+      {
+        "name": "processor",
+        "quantity": 0.25
+      },
+      {
+        "name": "storage",
+        "quantity": 0.31
+      }
+    ],
+    "dockerImage": "frontend;eexit/mirror-http-server"
+  },
+  "user": {
+    "hierarchyParent": [],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelUser",
+      "elasticity": 4,
+      "elasticityCost": 5.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "user",
+    "minimalCapacities": [
+      {
+        "name": "memory",
+        "quantity": 0.048
+      },
+      {
+        "name": "processor",
+        "quantity": 0.25
+      },
+      {
+        "name": "storage",
+        "quantity": 0.31
+      }
+    ],
+    "dockerImage": "user;eexit/mirror-http-server"
+  },
+  "post": {
+    "hierarchyParent": [],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelPost",
+      "elasticity": 10,
+      "elasticityCost": 5.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "post",
+    "minimalCapacities": [
+      {
+        "name": "memory",
+        "quantity": 0.048
+      },
+      {
+        "name": "processor",
+        "quantity": 0.25
+      },
+      {
+        "name": "storage",
+        "quantity": 0.31
+      }
+    ],
+    "dockerImage": "post;eexit/mirror-http-server"
+  },
+  "social-graph": {
+    "hierarchyParent": [],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelSocialGraph",
+      "elasticity": 5,
+      "elasticityCost": 5.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "social-graph",
+    "minimalCapacities": [
+      {
+        "name": "memory",
+        "quantity": 0.048
+      },
+      {
+        "name": "processor",
+        "quantity": 0.25
+      },
+      {
+        "name": "storage",
+        "quantity": 0.31
+      }
+    ],
+    "dockerImage": "social-graph;eexit/mirror-http-server"
+  },
+  "home-timeline": {
+    "hierarchyParent": [],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelHomeTimeline",
+      "elasticity": 10,
+      "elasticityCost": 5.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "home-timeline",
+    "minimalCapacities": [
+      {
+        "name": "memory",
+        "quantity": 0.048
+      },
+      {
+        "name": "processor",
+        "quantity": 0.25
+      },
+      {
+        "name": "storage",
+        "quantity": 0.31
+      }
+    ],
+    "dockerImage": "home-timeline;eexit/mirror-http-server"
+  },
+  "user-timeline": {
+    "hierarchyParent": [],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelUserTimeline",
+      "elasticity": 10,
+      "elasticityCost": 5.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "user-timeline",
+    "minimalCapacities": [
+      {
+        "name": "memory",
+        "quantity": 0.048
+      },
+      {
+        "name": "processor",
+        "quantity": 0.25
+      },
+      {
+        "name": "storage",
+        "quantity": 0.31
+      }
+    ],
+    "dockerImage": "user-timeline;eexit/mirror-http-server"
+  }
+}
