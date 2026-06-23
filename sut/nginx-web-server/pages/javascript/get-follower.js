@@ -1,6 +1,6 @@
 function showFollowers() {
     const Http = new XMLHttpRequest();
-    const url = 'http://' + globalThis.location.hostname + ':8080/api/user/get_follower';
+    const url = globalThis.location.origin + '/api/user/get_follower';
     Http.open("GET", url, true);
     Http.onreadystatechange = function () {
         if (this.readyState === 4 && this.status === 200) {

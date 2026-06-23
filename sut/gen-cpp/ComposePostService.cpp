@@ -203,7 +203,7 @@ uint32_t ComposePostService_ComposePost_args::write(::apache::thrift::protocol::
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 8);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter141;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter141;
     for (_iter141 = this->carrier.begin(); _iter141 != this->carrier.end(); ++_iter141)
     {
       xfer += oprot->writeString(_iter141->first);
@@ -275,7 +275,7 @@ uint32_t ComposePostService_ComposePost_pargs::write(::apache::thrift::protocol:
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 8);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter144;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter144;
     for (_iter144 = (*(this->carrier)).begin(); _iter144 != (*(this->carrier)).end(); ++_iter144)
     {
       xfer += oprot->writeString(_iter144->first);
@@ -398,13 +398,13 @@ uint32_t ComposePostService_ComposePost_presult::read(::apache::thrift::protocol
   return xfer;
 }
 
-void ComposePostServiceClient::ComposePost(const int64_t req_id, const std::string& username, const int64_t user_id, const std::string& text, const std::vector<int64_t> & media_ids, const std::vector<std::string> & media_types, const PostType::type post_type, const std::map<std::string, std::string> & carrier)
+void ComposePostServiceClient::ComposePost(const int64_t req_id, const std::string& username, const int64_t user_id, const std::string& text, const std::vector<int64_t> & media_ids, const std::vector<std::string> & media_types, const PostType::type post_type, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_ComposePost(req_id, username, user_id, text, media_ids, media_types, post_type, carrier);
   recv_ComposePost();
 }
 
-void ComposePostServiceClient::send_ComposePost(const int64_t req_id, const std::string& username, const int64_t user_id, const std::string& text, const std::vector<int64_t> & media_ids, const std::vector<std::string> & media_types, const PostType::type post_type, const std::map<std::string, std::string> & carrier)
+void ComposePostServiceClient::send_ComposePost(const int64_t req_id, const std::string& username, const int64_t user_id, const std::string& text, const std::vector<int64_t> & media_ids, const std::vector<std::string> & media_types, const PostType::type post_type, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("ComposePost", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -543,13 +543,13 @@ void ComposePostServiceProcessor::process_ComposePost(int32_t seqid, ::apache::t
   return processor;
 }
 
-void ComposePostServiceConcurrentClient::ComposePost(const int64_t req_id, const std::string& username, const int64_t user_id, const std::string& text, const std::vector<int64_t> & media_ids, const std::vector<std::string> & media_types, const PostType::type post_type, const std::map<std::string, std::string> & carrier)
+void ComposePostServiceConcurrentClient::ComposePost(const int64_t req_id, const std::string& username, const int64_t user_id, const std::string& text, const std::vector<int64_t> & media_ids, const std::vector<std::string> & media_types, const PostType::type post_type, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_ComposePost(req_id, username, user_id, text, media_ids, media_types, post_type, carrier);
   recv_ComposePost(seqid);
 }
 
-int32_t ComposePostServiceConcurrentClient::send_ComposePost(const int64_t req_id, const std::string& username, const int64_t user_id, const std::string& text, const std::vector<int64_t> & media_ids, const std::vector<std::string> & media_types, const PostType::type post_type, const std::map<std::string, std::string> & carrier)
+int32_t ComposePostServiceConcurrentClient::send_ComposePost(const int64_t req_id, const std::string& username, const int64_t user_id, const std::string& text, const std::vector<int64_t> & media_ids, const std::vector<std::string> & media_types, const PostType::type post_type, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);

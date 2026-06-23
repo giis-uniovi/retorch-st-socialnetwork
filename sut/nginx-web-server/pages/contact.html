@@ -8,12 +8,12 @@
     <title>Contact</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
         integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous" />
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.7/css/all.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+        integrity="sha384-DyZ88mC6Up2uqS4h/KRgHuoeGwBcD4Ng9SiP4dIRy0EXTlnuz47vAwmeGwVChigm" crossorigin="anonymous" />
     <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet"
         integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous" />
     <link rel="stylesheet" href="style/main.css" />
     <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
-    <script src="http://maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
 </head>
 
 <body>
@@ -90,8 +90,9 @@
                             enctype="application/x-www-form-urlencoded">
                             <div class="form-group mb-3">
                                 <input type="text" class="form-control mb-2" id="followee-name" name="followee_name"
-                                    placeholder="type a user name to follow">
-                                <input type="text" class="hide follow-username" id="user-name" name="user_name">
+                                    placeholder="type a user name to follow" aria-label="User name to follow">
+                                <input type="text" class="hide follow-username" id="user-name" name="user_name"
+                                    aria-label="Your user name">
                                 <input type="submit" class="btn btn-md btn-primary" value="Follow">
                             </div>
                         </form>
@@ -108,8 +109,9 @@
                             enctype="application/x-www-form-urlencoded">
                             <div class="form-group mb-3">
                                 <input type="text" class="form-control mb-2" id="unfollow-followee-name" name="followee_name"
-                                    placeholder="type a user name to unfollow">
-                                <input type="text" class="hide follow-username" name="user_name">
+                                    placeholder="type a user name to unfollow" aria-label="User name to unfollow">
+                                <input type="text" class="hide follow-username" id="unfollow-user-name" name="user_name"
+                                    aria-label="Your user name">
                                 <input type="submit" class="btn btn-md btn-primary" value="Unfollow">
                             </div>
                         </form>

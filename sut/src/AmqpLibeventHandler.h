@@ -11,7 +11,7 @@ namespace social_network {
 
 class LibEventHandler : public AMQP::LibEventHandler {
  public:
-  LibEventHandler(struct event_base* evbase) : AMQP::LibEventHandler(evbase),
+  explicit LibEventHandler(struct event_base* evbase) : AMQP::LibEventHandler(evbase),
                                                evbase_(evbase) {}
   void onError(AMQP::TcpConnection *connection, const char *message) override
   {
@@ -33,7 +33,6 @@ class AmqpLibeventHandler {
       : evbase_(event_base_new(), event_base_free)
       , evhandler_(evbase_.get())
   {
-    is_running_ = false;
   }
 
   void Start()
@@ -59,7 +58,7 @@ class AmqpLibeventHandler {
  private:
   EventBasePtrT evbase_;
   LibEventHandler evhandler_;
-  bool is_running_;
+  bool is_running_ = false;
 
 };
 

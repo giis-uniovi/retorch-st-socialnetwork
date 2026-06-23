@@ -10,7 +10,7 @@ function renderPosts(resp_json, els) {
         els.times[i].innerText = getTime(post_json["timestamp"]);
         els.creators[i].innerText = post_json["creator"]["username"];
         for (const media of post_json["media"]) {
-            els.images[i].src = "http://" + globalThis.location.hostname +
+            els.images[i].src = globalThis.location.protocol + "//" + globalThis.location.hostname +
                 ":8081/get-media/?filename=" + media["media_id"] + "." + media["media_type"];
         }
         validPost += 1;
@@ -25,14 +25,14 @@ function renderPosts(resp_json, els) {
 
 function handleUnauthorized() {
     console.log("unauthorized user login");
-    globalThis.location.href = 'http://' + globalThis.location.hostname + ":8080/index.html";
+    globalThis.location.href = globalThis.location.origin + "/index.html";
     localStorage.clear();
 }
 
 function showTimeline(type) {
     const start = 0;
     const stop = 100;
-    const url = 'http://' + globalThis.location.hostname + ':8080/api/' + type + '/read';
+    const url = globalThis.location.origin + '/api/' + type + '/read';
     const Http = new XMLHttpRequest();
     Http.open("GET", url + "?start=" + start + "&stop=" + stop, true);
     Http.onreadystatechange = function () {
@@ -81,7 +81,7 @@ function renderMentionedPosts(resp_json, mentioned_user, els) {
         els.times[i].innerText = getTime(post_json["timestamp"]);
         els.creators[i].innerText = post_json["creator"]["username"];
         for (const media of post_json["media"]) {
-            els.images[i].src = "http://" + globalThis.location.hostname +
+            els.images[i].src = globalThis.location.protocol + "//" + globalThis.location.hostname +
                 ":8081/get-media/?filename=" + media["media_id"] + "." + media["media_type"];
         }
         validPost += 1;
@@ -96,7 +96,7 @@ function renderMentionedPosts(resp_json, mentioned_user, els) {
 }
 
 function show_Mentioned_User_Timeline(mentioned_user) {
-    const url = 'http://' + globalThis.location.hostname + ':8080/api/home-timeline/read';
+    const url = globalThis.location.origin + '/api/home-timeline/read';
     const Http = new XMLHttpRequest();
     Http.open("GET", url + "?start=0&stop=100", true);
     Http.onreadystatechange = function () {
@@ -131,7 +131,7 @@ function replaceMentionWithHTMLLinks(text) {
 
 function get_follower() {
     const Http = new XMLHttpRequest();
-    const url = 'http://' + globalThis.location.hostname + ':8080/api/user/get_follower';
+    const url = globalThis.location.origin + '/api/user/get_follower';
     Http.open("GET", url, true);
     Http.onreadystatechange = function () {
         if (this.readyState === 4 && this.status === 200) {

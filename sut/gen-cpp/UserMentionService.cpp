@@ -121,7 +121,7 @@ uint32_t UserMentionService_ComposeUserMentions_args::write(::apache::thrift::pr
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 3);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter353;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter353;
     for (_iter353 = this->carrier.begin(); _iter353 != this->carrier.end(); ++_iter353)
     {
       xfer += oprot->writeString(_iter353->first);
@@ -165,7 +165,7 @@ uint32_t UserMentionService_ComposeUserMentions_pargs::write(::apache::thrift::p
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 3);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter355;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter355;
     for (_iter355 = (*(this->carrier)).begin(); _iter355 != (*(this->carrier)).end(); ++_iter355)
     {
       xfer += oprot->writeString(_iter355->first);
@@ -340,13 +340,13 @@ uint32_t UserMentionService_ComposeUserMentions_presult::read(::apache::thrift::
   return xfer;
 }
 
-void UserMentionServiceClient::ComposeUserMentions(std::vector<UserMention> & _return, const int64_t req_id, const std::vector<std::string> & usernames, const std::map<std::string, std::string> & carrier)
+void UserMentionServiceClient::ComposeUserMentions(std::vector<UserMention> & _return, const int64_t req_id, const std::vector<std::string> & usernames, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_ComposeUserMentions(req_id, usernames, carrier);
   recv_ComposeUserMentions(_return);
 }
 
-void UserMentionServiceClient::send_ComposeUserMentions(const int64_t req_id, const std::vector<std::string> & usernames, const std::map<std::string, std::string> & carrier)
+void UserMentionServiceClient::send_ComposeUserMentions(const int64_t req_id, const std::vector<std::string> & usernames, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("ComposeUserMentions", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -486,13 +486,13 @@ void UserMentionServiceProcessor::process_ComposeUserMentions(int32_t seqid, ::a
   return processor;
 }
 
-void UserMentionServiceConcurrentClient::ComposeUserMentions(std::vector<UserMention> & _return, const int64_t req_id, const std::vector<std::string> & usernames, const std::map<std::string, std::string> & carrier)
+void UserMentionServiceConcurrentClient::ComposeUserMentions(std::vector<UserMention> & _return, const int64_t req_id, const std::vector<std::string> & usernames, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_ComposeUserMentions(req_id, usernames, carrier);
   recv_ComposeUserMentions(_return, seqid);
 }
 
-int32_t UserMentionServiceConcurrentClient::send_ComposeUserMentions(const int64_t req_id, const std::vector<std::string> & usernames, const std::map<std::string, std::string> & carrier)
+int32_t UserMentionServiceConcurrentClient::send_ComposeUserMentions(const int64_t req_id, const std::vector<std::string> & usernames, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);

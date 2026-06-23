@@ -1,3 +1,5 @@
+#include <format>
+#include <cstddef>
 #ifndef SOCIAL_NETWORK_MICROSERVICES_UNIQUEIDHANDLER_H
 #define SOCIAL_NETWORK_MICROSERVICES_UNIQUEIDHANDLER_H
 
@@ -22,10 +24,9 @@ using std::chrono::duration_cast;
 using std::chrono::milliseconds;
 using std::chrono::system_clock;
 
-static int64_t current_timestamp = -1;
-static int counter = 0;
-
 static int GetCounter(int64_t timestamp) {
+  static thread_local int64_t current_timestamp = -1;
+  static thread_local int counter = 0;
   if (current_timestamp > timestamp) {
     LOG(fatal) << "Timestamps are not incremental.";
     exit(EXIT_FAILURE);
@@ -45,7 +46,7 @@ class UniqueIdHandler : public UniqueIdServiceIf {
   UniqueIdHandler(std::mutex *, const std::string &);
 
   int64_t ComposeUniqueId(int64_t, PostType::type,
-                          const std::map<std::string, std::string> &) override;
+                          const std::map<std::string, std::string, std::less<>> &) override;
 
  private:
   std::mutex *_thread_lock;
@@ -53,14 +54,12 @@ class UniqueIdHandler : public UniqueIdServiceIf {
 };
 
 UniqueIdHandler::UniqueIdHandler(std::mutex *thread_lock,
-                                 const std::string &machine_id) {
-  _thread_lock = thread_lock;
-  _machine_id = machine_id;
-}
+                                 const std::string &machine_id)
+    : _thread_lock(thread_lock), _machine_id(machine_id) {}
 
 int64_t UniqueIdHandler::ComposeUniqueId(
     int64_t req_id, PostType::type post_type,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
@@ -116,9 +115,9 @@ int64_t UniqueIdHandler::ComposeUniqueId(
  */
 u_int16_t HashMacAddressPid(const std::string &mac) {
   u_int16_t hash = 0;
-  std::string mac_pid = mac + std::to_string(getpid());
+  std::string mac_pid = std::format("{}{}", mac, getpid());
   for (unsigned int i = 0; i < mac_pid.size(); i++) {
-    hash += (mac[i] << ((i & 1) * 8));
+    hash += static_cast<u_int16_t>(std::to_integer<uint16_t>(static_cast<std::byte>(mac[i])) << ((i & 1) * 8));
   }
   return hash;
 }
