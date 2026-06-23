@@ -27,7 +27,7 @@ using apache::thrift::transport::TFramedTransportFactory;
 using apache::thrift::transport::TServerSocket;
 using namespace social_network;
 
-void sigintHandler(int sig) { exit(EXIT_SUCCESS); }
+void sigintHandler(int) { exit(EXIT_SUCCESS); }
 
 int main(int argc, char *argv[]) {
   signal(SIGINT, sigintHandler);

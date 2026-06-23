@@ -85,13 +85,6 @@ ThriftClient<TThriftClient>::ThriftClient(
     factory->ciphers(ciphers);
     factory->loadTrustedCertificates(ca_path.c_str());
 
-    // if (config_json["ssl"]["verifyClient"]) {
-    //   std::string cert_path = config_json["ssl"]["clientCertPath"];
-    //   std::string key_path = config_json["ssl"]["clientKeyPath"];
-    //   factory->loadCertificate(cert_path.c_str());
-    //   factory->loadPrivateKey(key_path.c_str());
-    // }
-    // Need verify server
     factory->authenticate(true);
     _socket = factory->createSocket(addr, port);
   } else {

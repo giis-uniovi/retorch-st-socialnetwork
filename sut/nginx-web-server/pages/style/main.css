@@ -52,9 +52,9 @@ body {
 }
 
 .unfollow {
-    color: #1f85de;
+    color: #1565c0;
     background-color: white;
-    border-color: #1f85de;
+    border-color: #1565c0;
 }
 .freq-c {
     color: green;
@@ -68,13 +68,13 @@ body {
 }
 .unfollow_clicked {
     color: white;
-    background-color: #1f85de;
+    background-color: #1565c0;
 }
 .freq-c:hover {
     color: green;
 }
 .unfollow:hover {
-    color: #1f85de;
+    color: #1565c0;
 }
 .unfollow_clicked:hover {
     color: white;

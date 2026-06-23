@@ -14,7 +14,7 @@
 #include "../tracing.h"
 
 // Custom Epoch (January 1, 2018 Midnight GMT = 2018-01-01T00:00:00Z)
-#define CUSTOM_EPOCH 1514764800000
+static constexpr long long CUSTOM_EPOCH = 1514764800000LL;
 
 namespace social_network {
 
@@ -63,7 +63,7 @@ int64_t UniqueIdHandler::ComposeUniqueId(
     const std::map<std::string, std::string> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(

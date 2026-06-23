@@ -42,7 +42,7 @@ void UserMentionHandler::ComposeUserMentions(
     const std::map<std::string, std::string> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
@@ -105,13 +105,13 @@ void UserMentionHandler::ComposeUserMentions(
     while (true) {
       return_value = memcached_fetch(client, return_key, &return_key_length,
                                      &return_value_length, &flags, &rc);
+      std::unique_ptr<char, decltype(std::free)*> rv_guard(return_value, std::free);
       if (return_value == nullptr) {
         LOG(debug) << "Memcached mget finished "
                    << memcached_strerror(client, rc);
         break;
       }
       if (rc != MEMCACHED_SUCCESS) {
-        free(return_value);
         memcached_quit(client);
         memcached_pool_push(_memcached_client_pool, client);
         LOG(error) << "Cannot get components of request " << req_id;
@@ -131,7 +131,6 @@ void UserMentionHandler::ComposeUserMentions(
           std::string(return_value, return_value + return_value_length));
       user_mentions.emplace_back(new_user_mention);
       usernames_not_cached.erase(username);
-      free(return_value);
     }
     memcached_quit(client);
     memcached_pool_push(_memcached_client_pool, client);

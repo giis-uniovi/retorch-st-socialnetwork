@@ -109,7 +109,7 @@ void HomeTimelineHandler::WriteHomeTimeline(
   // Find followers of the user
   auto followers_span = opentracing::Tracer::Global()->StartSpan(
       "get_followers_client", {opentracing::ChildOf(&span->context())});
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   opentracing::Tracer::Global()->Inject(followers_span->context(), writer);
 
@@ -183,7 +183,7 @@ void HomeTimelineHandler::WriteHomeTimeline(
         auto pipe = pipe_map.find(conn);
         if(pipe == pipe_map.end()) {//Not found, create new pipeline and insert
           auto new_pipe = std::make_shared<Pipeline>(_redis_cluster_client_pool->pipeline(std::to_string(follower_id), false));
-          pipe_map.insert(make_pair(conn, new_pipe));
+          pipe_map.try_emplace(conn, new_pipe);
           auto *_pipe = new_pipe.get();
           _pipe->zadd(std::to_string(follower_id), post_id_str, timestamp,
                   UpdateType::NOT_EXIST);
@@ -194,7 +194,6 @@ void HomeTimelineHandler::WriteHomeTimeline(
                   UpdateType::NOT_EXIST);
         }
       }
-      // LOG(info) <<"followers_id_set items:" << followers_id_set.size()<<"; pipeline items:" << pipe_map.size();
       try {
         for(auto const &it : pipe_map) {
           auto _pipe = it.second.get();
@@ -216,7 +215,7 @@ void HomeTimelineHandler::ReadHomeTimeline(
     int stop_idx, const std::map<std::string, std::string> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(

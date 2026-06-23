@@ -50,7 +50,7 @@ void PostStorageHandler::StorePost(
     const std::map<std::string, std::string> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
@@ -166,7 +166,7 @@ void PostStorageHandler::ReadPost(
     const std::map<std::string, std::string> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
@@ -189,9 +189,10 @@ void PostStorageHandler::ReadPost(
   uint32_t memcached_flags;
   auto get_span = opentracing::Tracer::Global()->StartSpan(
       "post_storage_mmc_get_client", {opentracing::ChildOf(&span->context())});
-  char *post_mmc =
+  std::unique_ptr<char, decltype(std::free)*> post_mmc_guard(
       memcached_get(memcached_client, post_id_str.c_str(), post_id_str.length(),
-                    &post_mmc_size, &memcached_flags, &memcached_rc);
+                    &post_mmc_size, &memcached_flags, &memcached_rc), std::free);
+  char *post_mmc = post_mmc_guard.get();
   if (!post_mmc && memcached_rc != MEMCACHED_NOTFOUND) {
     ServiceException se;
     se.errorCode = ErrorCode::SE_MEMCACHED_ERROR;
@@ -231,7 +232,6 @@ void PostStorageHandler::ReadPost(
       url.expanded_url = item["expanded_url"];
       _return.urls.emplace_back(url);
     }
-    free(post_mmc);
   } else {
     // If not cached in memcached
     mongoc_client_t *mongodb_client =
@@ -356,7 +356,7 @@ void PostStorageHandler::ReadPosts(
     const std::map<std::string, std::string> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
@@ -423,12 +423,12 @@ void PostStorageHandler::ReadPosts(
     return_value =
         memcached_fetch(memcached_client, return_key, &return_key_length,
                         &return_value_length, &flags, &memcached_rc);
+    std::unique_ptr<char, decltype(std::free)*> rv_guard(return_value, std::free);
     if (return_value == nullptr) {
       LOG(debug) << "Memcached mget finished";
       break;
     }
     if (memcached_rc != MEMCACHED_SUCCESS) {
-      free(return_value);
       memcached_quit(memcached_client);
       memcached_pool_push(_memcached_client_pool, memcached_client);
       LOG(error) << "Cannot get posts of request " << req_id;
@@ -465,9 +465,8 @@ void PostStorageHandler::ReadPosts(
       url.expanded_url = item["expanded_url"];
       new_post.urls.emplace_back(url);
     }
-    return_map.insert(std::make_pair(new_post.post_id, new_post));
+    return_map.try_emplace(new_post.post_id, new_post);
     post_ids_not_cached.erase(new_post.post_id);
-    free(return_value);
   }
   get_span->Finish();
   memcached_quit(memcached_client);
@@ -555,8 +554,8 @@ void PostStorageHandler::ReadPosts(
         url.expanded_url = item["expanded_url"];
         new_post.urls.emplace_back(url);
       }
-      post_json_map.insert({new_post.post_id, std::string(post_json_char)});
-      return_map.insert({new_post.post_id, new_post});
+      post_json_map.try_emplace(new_post.post_id, std::string(post_json_char));
+      return_map.try_emplace(new_post.post_id, new_post);
       bson_free(post_json_char);
     }
     find_span->Finish();
