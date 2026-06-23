@@ -1,9 +1,27 @@
 import aiohttp
 import asyncio
 import os
+import re
 import string
 import random
 import argparse
+
+
+def validate_args(args):
+    # Constrain CLI-supplied values to safe character sets before they reach the
+    # filesystem (graph -> os.path.join) or the network (ip/port -> request URL),
+    # preventing path traversal and SSRF via crafted arguments. The regex-matched
+    # substrings (not the raw arguments) are returned and used at the sinks.
+    graph_match = re.fullmatch(r'[A-Za-z0-9_-]+', args.graph)
+    if not graph_match:
+        raise ValueError('Invalid --graph: only letters, digits, "_" and "-" are allowed')
+    ip_match = re.fullmatch(r'[A-Za-z0-9.-]+', str(args.ip))
+    if not ip_match:
+        raise ValueError('Invalid --ip: only hostnames or IP addresses are allowed')
+    port = int(args.port)
+    if not 0 < port < 65536:
+        raise ValueError('Invalid --port: must be between 1 and 65535')
+    return graph_match.group(0), ip_match.group(0), port
 
 
 async def upload_follow(session, addr, user_0, user_1):
@@ -137,15 +155,16 @@ if __name__ == '__main__':
                         help='intialize with up to 20 posts per user', default=False)
     parser.add_argument('--limit', type=int, help='total number simultaneous connections', default=200)
     args = parser.parse_args()
+    graph, ip, port = validate_args(args)
 
-    with open(os.path.join('datasets/social-graph', args.graph, f'{args.graph}.nodes'), 'r') as f:
+    with open(os.path.join('datasets/social-graph', graph, f'{graph}.nodes'), 'r') as f:
         nodes = get_num_nodes(f)
-    with open(os.path.join('datasets/social-graph', args.graph, f'{args.graph}.edges'), 'r') as f:
+    with open(os.path.join('datasets/social-graph', graph, f'{graph}.edges'), 'r') as f:
         edges = get_edges(f)
 
     random.seed(1)
 
-    addr = 'http://{}:{}'.format(args.ip, args.port)
+    addr = 'http://{}:{}'.format(ip, port)
     limit = args.limit
     loop = asyncio.new_event_loop()
     future = asyncio.ensure_future(register(addr, nodes, limit), loop=loop)

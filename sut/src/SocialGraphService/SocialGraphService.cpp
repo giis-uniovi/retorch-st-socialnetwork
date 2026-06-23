@@ -19,7 +19,7 @@ using apache::thrift::transport::TFramedTransportFactory;
 using apache::thrift::transport::TServerSocket;
 using namespace social_network;
 
-void sigintHandler(int) { exit(EXIT_SUCCESS); }
+[[noreturn]] void sigintHandler(int) { exit(EXIT_SUCCESS); }
 
 int main(int argc, char *argv[]) {
   signal(SIGINT, sigintHandler);
@@ -43,10 +43,8 @@ int main(int argc, char *argv[]) {
   }
 
   bool redis_cluster_flag = false;
-  if (vm.count("redis-cluster")) {
-    if (vm["redis-cluster"].as<bool>()) {
-      redis_cluster_flag = true;
-    }
+  if (vm.count("redis-cluster") && vm["redis-cluster"].as<bool>()) {
+    redis_cluster_flag = true;
   }
 
   SetUpTracer("config/jaeger-config.yml", "social-graph-service");

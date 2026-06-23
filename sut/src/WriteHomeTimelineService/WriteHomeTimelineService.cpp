@@ -5,6 +5,7 @@
 #include <set>
 #include <sstream>
 #include <thread>
+#include <stop_token>
 
 #include "../../gen-cpp/SocialGraphService.h"
 #include "../../gen-cpp/social_network_types.h"
@@ -18,21 +19,20 @@
 
 using namespace social_network;
 
-static std::exception_ptr _teptr;
-static ClientPool<RedisClient> *_redis_client_pool;
-static ClientPool<ThriftClient<SocialGraphServiceClient>>
-    *_social_graph_client_pool;
+[[noreturn]] void sigintHandler(int) { exit(EXIT_SUCCESS); }
 
-void sigintHandler(int) { exit(EXIT_SUCCESS); }
-
-void OnReceivedWorker(const AMQP::Message &msg) {
+void OnReceivedWorker(
+    const AMQP::Message &msg,
+    ClientPool<RedisClient> *redis_client_pool,
+    ClientPool<ThriftClient<SocialGraphServiceClient>>
+        *social_graph_client_pool) {
   try {
     json msg_json = json::parse(std::string(msg.body(), msg.bodySize()));
 
-    std::map<std::string, std::string> carrier;
+    std::map<std::string, std::string, std::less<>> carrier;
     for (auto it = msg_json["carrier"].begin(); it != msg_json["carrier"].end();
          ++it) {
-      carrier.emplace(std::make_pair(it.key(), it.value()));
+      carrier.try_emplace(it.key(), it.value());
     }
 
     // Jaeger tracing
@@ -56,7 +56,7 @@ void OnReceivedWorker(const AMQP::Message &msg) {
     TextMapWriter writer(writer_text_map);
     opentracing::Tracer::Global()->Inject(followers_span->context(), writer);
 
-    auto social_graph_client_wrapper = _social_graph_client_pool->Pop();
+    auto social_graph_client_wrapper = social_graph_client_pool->Pop();
     if (!social_graph_client_wrapper) {
       ServiceException se;
       se.errorCode = ErrorCode::SE_THRIFT_CONN_ERROR;
@@ -70,10 +70,10 @@ void OnReceivedWorker(const AMQP::Message &msg) {
                                         writer_text_map);
     } catch (...) {
       LOG(error) << "Failed to get followers from social-network-service";
-      _social_graph_client_pool->Remove(social_graph_client_wrapper);
+      social_graph_client_pool->Remove(social_graph_client_wrapper);
       throw;
     }
-    _social_graph_client_pool->Keepalive(social_graph_client_wrapper);
+    social_graph_client_pool->Keepalive(social_graph_client_wrapper);
     followers_span->Finish();
 
     std::set<int64_t> followers_id_set(followers_id.begin(),
@@ -84,7 +84,7 @@ void OnReceivedWorker(const AMQP::Message &msg) {
     auto redis_span = opentracing::Tracer::Global()->StartSpan(
         "write_home_timeline_redis_update_client",
         {opentracing::ChildOf(&span->context())});
-    auto redis_client_wrapper = _redis_client_pool->Pop();
+    auto redis_client_wrapper = redis_client_pool->Pop();
     if (!redis_client_wrapper) {
       ServiceException se;
       se.errorCode = ErrorCode::SE_REDIS_ERROR;
@@ -104,7 +104,7 @@ void OnReceivedWorker(const AMQP::Message &msg) {
 
     redis_client->sync_commit();
     redis_span->Finish();
-    _redis_client_pool->Keepalive(redis_client_wrapper);
+    redis_client_pool->Keepalive(redis_client_wrapper);
   } catch (...) {
     LOG(error) << "OnReveived worker error";
     throw;
@@ -120,7 +120,11 @@ void HeartbeatSend(AmqpLibeventHandler &handler,
   }
 }
 
-void WorkerThread(std::string &addr, int port) {
+void WorkerThread(
+    std::string &addr, int port,
+    ClientPool<RedisClient> *redis_client_pool,
+    ClientPool<ThriftClient<SocialGraphServiceClient>>
+        *social_graph_client_pool) {
   AmqpLibeventHandler handler;
   AMQP::TcpConnection connection(
       handler, AMQP::Address(addr, port, AMQP::Login("guest", "guest"), "/"));
@@ -135,14 +139,14 @@ void WorkerThread(std::string &addr, int port) {
         LOG(debug) << "Created queue: " << name;
       });
   channel.consume("write-home-timeline", AMQP::noack)
-      .onReceived([](const AMQP::Message &msg, uint64_t tag, bool redelivered) {
+      .onReceived([redis_client_pool, social_graph_client_pool](
+                      const AMQP::Message &msg, uint64_t tag, bool redelivered) {
         LOG(debug) << "Received: " << std::string(msg.body(), msg.bodySize());
-        OnReceivedWorker(msg);
+        OnReceivedWorker(msg, redis_client_pool, social_graph_client_pool);
       });
 
-  std::thread heartbeat_thread(HeartbeatSend, std::ref(handler),
+  std::jthread heartbeat_thread(HeartbeatSend, std::ref(handler),
                                std::ref(connection), 30);
-  heartbeat_thread.detach();
   handler.Start();
   LOG(debug) << "Closing connection.";
   connection.close();
@@ -159,7 +163,6 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  int port = config_json["write-home-timeline-service"]["port"];
   int n_workers = config_json["write-home-timeline-service"]["workers"];
 
   std::string rabbitmq_addr =
@@ -191,24 +194,14 @@ int main(int argc, char *argv[]) {
       social_graph_service_port, 0, social_graph_service_conns,
       social_graph_service_timeout, social_graph_service_keepalive, config_json);
 
-  _redis_client_pool = &redis_client_pool;
-  _social_graph_client_pool = &social_graph_client_pool;
-
-  std::unique_ptr<std::thread> threads_ptr[n_workers];
+  std::unique_ptr<std::jthread> threads_ptr[n_workers];
   for (auto &thread_ptr : threads_ptr) {
-    thread_ptr = std::make_unique<std::thread>(
-        WorkerThread, std::ref(rabbitmq_addr), rabbitmq_port);
+    thread_ptr = std::make_unique<std::jthread>(
+        WorkerThread, std::ref(rabbitmq_addr), rabbitmq_port,
+        &redis_client_pool, &social_graph_client_pool);
   }
   for (auto &thread_ptr : threads_ptr) {
     thread_ptr->join();
-    if (_teptr) {
-      try {
-        std::rethrow_exception(_teptr);
-      } catch (const std::exception &ex) {
-        LOG(error) << "Thread exited with exception: " << ex.what();
-        exit(1);
-      }
-    }
   }
 
   return 0;

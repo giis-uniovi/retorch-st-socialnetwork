@@ -3,6 +3,7 @@
 
 #include <string>
 #include <chrono>
+#include <memory>
 #include <cpp_redis/cpp_redis>
 
 #include "logger.h"
@@ -10,7 +11,7 @@
 
 namespace social_network {
 
-class RedisClient : public GenericClient {
+class RedisClient final : public GenericClient {
  public:
   RedisClient(const std::string &addr, int port);
   RedisClient(const std::string &addr, int port, int keepalive_ms);
@@ -28,36 +29,32 @@ class RedisClient : public GenericClient {
   bool IsConnected() override ;
 
  private:
-  cpp_redis::client * _client;
+  std::unique_ptr<cpp_redis::client> _client;
 };
 
-RedisClient::RedisClient(const std::string &addr, int port) {
-  _addr = addr;
-  _port = port;
-  _client = new cpp_redis::client();
-}
+RedisClient::RedisClient(const std::string &addr, int port)
+    : GenericClient(addr, port),
+      _client(std::make_unique<cpp_redis::client>()) {}
 
-RedisClient::RedisClient(const std::string &addr, int port, int keepalive_ms) {
-  _addr = addr;
-  _port = port;
-  _keepalive_ms = keepalive_ms;
-  _connect_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::system_clock::now().time_since_epoch()).count();
-  _client = new cpp_redis::client();
+RedisClient::RedisClient(const std::string &addr, int port, int keepalive_ms)
+    : GenericClient(addr, port) {
+  set_keepalive_ms(keepalive_ms);
+  set_connect_timestamp(std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count());
+  _client = std::make_unique<cpp_redis::client>();
 }
 
 RedisClient::~RedisClient() {
   Disconnect();
-  delete _client;
 }
 
 cpp_redis::client* RedisClient::GetClient() const {
-  return _client;
+  return _client.get();
 }
 
 void RedisClient::Connect() {
   if (!IsConnected()) {
-    _client->connect(_addr, _port, [](const std::string& host, std::size_t port,
+    _client->connect(addr(), port(), [](const std::string& host, std::size_t port,
         cpp_redis::client::connect_state status) {
       if (status == cpp_redis::client::connect_state::dropped) {
         LOG(error) << "Failed to connect " << host << ":" << port;

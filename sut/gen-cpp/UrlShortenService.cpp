@@ -121,7 +121,7 @@ uint32_t UrlShortenService_ComposeUrls_args::write(::apache::thrift::protocol::T
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 3);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter380;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter380;
     for (_iter380 = this->carrier.begin(); _iter380 != this->carrier.end(); ++_iter380)
     {
       xfer += oprot->writeString(_iter380->first);
@@ -165,7 +165,7 @@ uint32_t UrlShortenService_ComposeUrls_pargs::write(::apache::thrift::protocol::
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 3);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter382;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter382;
     for (_iter382 = (*(this->carrier)).begin(); _iter382 != (*(this->carrier)).end(); ++_iter382)
     {
       xfer += oprot->writeString(_iter382->first);
@@ -453,7 +453,7 @@ uint32_t UrlShortenService_GetExtendedUrls_args::write(::apache::thrift::protoco
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 3);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter407;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter407;
     for (_iter407 = this->carrier.begin(); _iter407 != this->carrier.end(); ++_iter407)
     {
       xfer += oprot->writeString(_iter407->first);
@@ -497,7 +497,7 @@ uint32_t UrlShortenService_GetExtendedUrls_pargs::write(::apache::thrift::protoc
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 3);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter409;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter409;
     for (_iter409 = (*(this->carrier)).begin(); _iter409 != (*(this->carrier)).end(); ++_iter409)
     {
       xfer += oprot->writeString(_iter409->first);
@@ -672,13 +672,13 @@ uint32_t UrlShortenService_GetExtendedUrls_presult::read(::apache::thrift::proto
   return xfer;
 }
 
-void UrlShortenServiceClient::ComposeUrls(std::vector<Url> & _return, const int64_t req_id, const std::vector<std::string> & urls, const std::map<std::string, std::string> & carrier)
+void UrlShortenServiceClient::ComposeUrls(std::vector<Url> & _return, const int64_t req_id, const std::vector<std::string> & urls, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_ComposeUrls(req_id, urls, carrier);
   recv_ComposeUrls(_return);
 }
 
-void UrlShortenServiceClient::send_ComposeUrls(const int64_t req_id, const std::vector<std::string> & urls, const std::map<std::string, std::string> & carrier)
+void UrlShortenServiceClient::send_ComposeUrls(const int64_t req_id, const std::vector<std::string> & urls, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("ComposeUrls", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -735,13 +735,13 @@ void UrlShortenServiceClient::recv_ComposeUrls(std::vector<Url> & _return)
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ComposeUrls failed: unknown result");
 }
 
-void UrlShortenServiceClient::GetExtendedUrls(std::vector<std::string> & _return, const int64_t req_id, const std::vector<std::string> & shortened_urls, const std::map<std::string, std::string> & carrier)
+void UrlShortenServiceClient::GetExtendedUrls(std::vector<std::string> & _return, const int64_t req_id, const std::vector<std::string> & shortened_urls, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_GetExtendedUrls(req_id, shortened_urls, carrier);
   recv_GetExtendedUrls(_return);
 }
 
-void UrlShortenServiceClient::send_GetExtendedUrls(const int64_t req_id, const std::vector<std::string> & shortened_urls, const std::map<std::string, std::string> & carrier)
+void UrlShortenServiceClient::send_GetExtendedUrls(const int64_t req_id, const std::vector<std::string> & shortened_urls, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("GetExtendedUrls", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -938,13 +938,13 @@ void UrlShortenServiceProcessor::process_GetExtendedUrls(int32_t seqid, ::apache
   return processor;
 }
 
-void UrlShortenServiceConcurrentClient::ComposeUrls(std::vector<Url> & _return, const int64_t req_id, const std::vector<std::string> & urls, const std::map<std::string, std::string> & carrier)
+void UrlShortenServiceConcurrentClient::ComposeUrls(std::vector<Url> & _return, const int64_t req_id, const std::vector<std::string> & urls, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_ComposeUrls(req_id, urls, carrier);
   recv_ComposeUrls(_return, seqid);
 }
 
-int32_t UrlShortenServiceConcurrentClient::send_ComposeUrls(const int64_t req_id, const std::vector<std::string> & urls, const std::map<std::string, std::string> & carrier)
+int32_t UrlShortenServiceConcurrentClient::send_ComposeUrls(const int64_t req_id, const std::vector<std::string> & urls, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);
@@ -1028,13 +1028,13 @@ void UrlShortenServiceConcurrentClient::recv_ComposeUrls(std::vector<Url> & _ret
   } // end while(true)
 }
 
-void UrlShortenServiceConcurrentClient::GetExtendedUrls(std::vector<std::string> & _return, const int64_t req_id, const std::vector<std::string> & shortened_urls, const std::map<std::string, std::string> & carrier)
+void UrlShortenServiceConcurrentClient::GetExtendedUrls(std::vector<std::string> & _return, const int64_t req_id, const std::vector<std::string> & shortened_urls, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_GetExtendedUrls(req_id, shortened_urls, carrier);
   recv_GetExtendedUrls(_return, seqid);
 }
 
-int32_t UrlShortenServiceConcurrentClient::send_GetExtendedUrls(const int64_t req_id, const std::vector<std::string> & shortened_urls, const std::map<std::string, std::string> & carrier)
+int32_t UrlShortenServiceConcurrentClient::send_GetExtendedUrls(const int64_t req_id, const std::vector<std::string> & shortened_urls, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);

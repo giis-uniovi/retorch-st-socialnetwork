@@ -1,3 +1,4 @@
+#include <format>
 #ifndef SOCIAL_NETWORK_MICROSERVICES_SRC_USERMENTIONSERVICE_USERMENTIONHANDLER_H_
 #define SOCIAL_NETWORK_MICROSERVICES_SRC_USERMENTIONSERVICE_USERMENTIONHANDLER_H_
 
@@ -22,7 +23,7 @@ class UserMentionHandler : public UserMentionServiceIf {
 
   void ComposeUserMentions(std::vector<UserMention> &_return, int64_t,
                            const std::vector<std::string> &,
-                           const std::map<std::string, std::string> &) override;
+                           const std::map<std::string, std::string, std::less<>> &) override;
 
  private:
   memcached_pool_st *_memcached_client_pool;
@@ -39,7 +40,7 @@ UserMentionHandler::UserMentionHandler(
 void UserMentionHandler::ComposeUserMentions(
     std::vector<UserMention> &_return, int64_t req_id,
     const std::vector<std::string> &usernames,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
@@ -52,10 +53,10 @@ void UserMentionHandler::ComposeUserMentions(
 
   std::vector<UserMention> user_mentions;
   if (!usernames.empty()) {
-    std::map<std::string, bool> usernames_not_cached;
+    std::map<std::string, bool, std::less<>> usernames_not_cached;
 
     for (auto &username : usernames) {
-      usernames_not_cached.emplace(std::make_pair(username, false));
+      usernames_not_cached.try_emplace(username, false);
     }
 
     // Find in Memcached
@@ -76,7 +77,7 @@ void UserMentionHandler::ComposeUserMentions(
     for (auto &username : usernames) {
       std::string key_str = username + ":user_id";
       keys[idx] = new char[key_str.length() + 1];
-      strcpy(keys[idx], key_str.c_str());
+      memcpy(keys[idx], key_str.c_str(), key_str.length() + 1);
       key_sizes[idx] = key_str.length();
       idx++;
     }
@@ -105,7 +106,8 @@ void UserMentionHandler::ComposeUserMentions(
     while (true) {
       return_value = memcached_fetch(client, return_key, &return_key_length,
                                      &return_value_length, &flags, &rc);
-      std::unique_ptr<char, decltype(std::free)*> rv_guard(return_value, std::free);
+      std::unique_ptr<char, void (*)(char *)> rv_guard(return_value,
+                                                       [](char *p) { std::free(p); });
       if (return_value == nullptr) {
         LOG(debug) << "Memcached mget finished "
                    << memcached_strerror(client, rc);
@@ -118,7 +120,7 @@ void UserMentionHandler::ComposeUserMentions(
         ServiceException se;
         se.errorCode = ErrorCode::SE_MEMCACHED_ERROR;
         se.message =
-            "Cannot get usernames of request " + std::to_string(req_id);
+            std::format("Cannot get usernames of request {}", req_id);
         get_span->Finish();
         throw se;
       }
@@ -171,9 +173,9 @@ void UserMentionHandler::ComposeUserMentions(
 
       BSON_APPEND_DOCUMENT_BEGIN(query, "username", &query_child_0);
       BSON_APPEND_ARRAY_BEGIN(&query_child_0, "$in", &query_username_list);
-      for (auto &item : usernames_not_cached) {
+      for (auto &[username, cached] : usernames_not_cached) {
         bson_uint32_to_string(idx, &key, buf, sizeof buf);
-        BSON_APPEND_UTF8(&query_username_list, key, item.first.c_str());
+        BSON_APPEND_UTF8(&query_username_list, key, username.c_str());
         idx++;
       }
       bson_append_array_end(&query_child_0, &query_username_list);

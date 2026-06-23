@@ -153,7 +153,7 @@ uint32_t MediaService_ComposeMedia_args::write(::apache::thrift::protocol::TProt
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 4);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter440;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter440;
     for (_iter440 = this->carrier.begin(); _iter440 != this->carrier.end(); ++_iter440)
     {
       xfer += oprot->writeString(_iter440->first);
@@ -209,7 +209,7 @@ uint32_t MediaService_ComposeMedia_pargs::write(::apache::thrift::protocol::TPro
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 4);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter443;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter443;
     for (_iter443 = (*(this->carrier)).begin(); _iter443 != (*(this->carrier)).end(); ++_iter443)
     {
       xfer += oprot->writeString(_iter443->first);
@@ -384,13 +384,13 @@ uint32_t MediaService_ComposeMedia_presult::read(::apache::thrift::protocol::TPr
   return xfer;
 }
 
-void MediaServiceClient::ComposeMedia(std::vector<Media> & _return, const int64_t req_id, const std::vector<std::string> & media_types, const std::vector<int64_t> & media_ids, const std::map<std::string, std::string> & carrier)
+void MediaServiceClient::ComposeMedia(std::vector<Media> & _return, const int64_t req_id, const std::vector<std::string> & media_types, const std::vector<int64_t> & media_ids, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_ComposeMedia(req_id, media_types, media_ids, carrier);
   recv_ComposeMedia(_return);
 }
 
-void MediaServiceClient::send_ComposeMedia(const int64_t req_id, const std::vector<std::string> & media_types, const std::vector<int64_t> & media_ids, const std::map<std::string, std::string> & carrier)
+void MediaServiceClient::send_ComposeMedia(const int64_t req_id, const std::vector<std::string> & media_types, const std::vector<int64_t> & media_ids, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("ComposeMedia", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -531,13 +531,13 @@ void MediaServiceProcessor::process_ComposeMedia(int32_t seqid, ::apache::thrift
   return processor;
 }
 
-void MediaServiceConcurrentClient::ComposeMedia(std::vector<Media> & _return, const int64_t req_id, const std::vector<std::string> & media_types, const std::vector<int64_t> & media_ids, const std::map<std::string, std::string> & carrier)
+void MediaServiceConcurrentClient::ComposeMedia(std::vector<Media> & _return, const int64_t req_id, const std::vector<std::string> & media_types, const std::vector<int64_t> & media_ids, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_ComposeMedia(req_id, media_types, media_ids, carrier);
   recv_ComposeMedia(_return, seqid);
 }
 
-int32_t MediaServiceConcurrentClient::send_ComposeMedia(const int64_t req_id, const std::vector<std::string> & media_types, const std::vector<int64_t> & media_ids, const std::map<std::string, std::string> & carrier)
+int32_t MediaServiceConcurrentClient::send_ComposeMedia(const int64_t req_id, const std::vector<std::string> & media_types, const std::vector<int64_t> & media_ids, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);

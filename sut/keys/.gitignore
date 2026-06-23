@@ -1,0 +1,4 @@
+# TLS private key material is generated locally, never committed.
+# Run ./generate-tls-keys.sh to (re)create these for TLS deployments.
+server.key
+server.pem

@@ -137,7 +137,7 @@ uint32_t UserService_RegisterUser_args::write(::apache::thrift::protocol::TProto
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 6);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter74;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter74;
     for (_iter74 = this->carrier.begin(); _iter74 != this->carrier.end(); ++_iter74)
     {
       xfer += oprot->writeString(_iter74->first);
@@ -185,7 +185,7 @@ uint32_t UserService_RegisterUser_pargs::write(::apache::thrift::protocol::TProt
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 6);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter75;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter75;
     for (_iter75 = (*(this->carrier)).begin(); _iter75 != (*(this->carrier)).end(); ++_iter75)
     {
       xfer += oprot->writeString(_iter75->first);
@@ -449,7 +449,7 @@ uint32_t UserService_RegisterUserWithId_args::write(::apache::thrift::protocol::
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 7);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter83;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter83;
     for (_iter83 = this->carrier.begin(); _iter83 != this->carrier.end(); ++_iter83)
     {
       xfer += oprot->writeString(_iter83->first);
@@ -501,7 +501,7 @@ uint32_t UserService_RegisterUserWithId_pargs::write(::apache::thrift::protocol:
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 7);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter84;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter84;
     for (_iter84 = (*(this->carrier)).begin(); _iter84 != (*(this->carrier)).end(); ++_iter84)
     {
       xfer += oprot->writeString(_iter84->first);
@@ -729,7 +729,7 @@ uint32_t UserService_Login_args::write(::apache::thrift::protocol::TProtocol* op
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 4);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter92;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter92;
     for (_iter92 = this->carrier.begin(); _iter92 != this->carrier.end(); ++_iter92)
     {
       xfer += oprot->writeString(_iter92->first);
@@ -769,7 +769,7 @@ uint32_t UserService_Login_pargs::write(::apache::thrift::protocol::TProtocol* o
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 4);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter93;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter93;
     for (_iter93 = (*(this->carrier)).begin(); _iter93 != (*(this->carrier)).end(); ++_iter93)
     {
       xfer += oprot->writeString(_iter93->first);
@@ -1017,7 +1017,7 @@ uint32_t UserService_ComposeCreatorWithUserId_args::write(::apache::thrift::prot
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 4);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter101;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter101;
     for (_iter101 = this->carrier.begin(); _iter101 != this->carrier.end(); ++_iter101)
     {
       xfer += oprot->writeString(_iter101->first);
@@ -1057,7 +1057,7 @@ uint32_t UserService_ComposeCreatorWithUserId_pargs::write(::apache::thrift::pro
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 4);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter102;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter102;
     for (_iter102 = (*(this->carrier)).begin(); _iter102 != (*(this->carrier)).end(); ++_iter102)
     {
       xfer += oprot->writeString(_iter102->first);
@@ -1293,7 +1293,7 @@ uint32_t UserService_ComposeCreatorWithUsername_args::write(::apache::thrift::pr
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 3);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter110;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter110;
     for (_iter110 = this->carrier.begin(); _iter110 != this->carrier.end(); ++_iter110)
     {
       xfer += oprot->writeString(_iter110->first);
@@ -1329,7 +1329,7 @@ uint32_t UserService_ComposeCreatorWithUsername_pargs::write(::apache::thrift::p
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 3);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter111;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter111;
     for (_iter111 = (*(this->carrier)).begin(); _iter111 != (*(this->carrier)).end(); ++_iter111)
     {
       xfer += oprot->writeString(_iter111->first);
@@ -1565,7 +1565,7 @@ uint32_t UserService_GetUserId_args::write(::apache::thrift::protocol::TProtocol
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 3);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter119;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter119;
     for (_iter119 = this->carrier.begin(); _iter119 != this->carrier.end(); ++_iter119)
     {
       xfer += oprot->writeString(_iter119->first);
@@ -1601,7 +1601,7 @@ uint32_t UserService_GetUserId_pargs::write(::apache::thrift::protocol::TProtoco
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 3);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter120;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter120;
     for (_iter120 = (*(this->carrier)).begin(); _iter120 != (*(this->carrier)).end(); ++_iter120)
     {
       xfer += oprot->writeString(_iter120->first);
@@ -1744,13 +1744,13 @@ uint32_t UserService_GetUserId_presult::read(::apache::thrift::protocol::TProtoc
   return xfer;
 }
 
-void UserServiceClient::RegisterUser(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::RegisterUser(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_RegisterUser(req_id, first_name, last_name, username, password, carrier);
   recv_RegisterUser();
 }
 
-void UserServiceClient::send_RegisterUser(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::send_RegisterUser(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("RegisterUser", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -1805,13 +1805,13 @@ void UserServiceClient::recv_RegisterUser()
   return;
 }
 
-void UserServiceClient::RegisterUserWithId(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const int64_t user_id, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::RegisterUserWithId(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const int64_t user_id, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_RegisterUserWithId(req_id, first_name, last_name, username, password, user_id, carrier);
   recv_RegisterUserWithId();
 }
 
-void UserServiceClient::send_RegisterUserWithId(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const int64_t user_id, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::send_RegisterUserWithId(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const int64_t user_id, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("RegisterUserWithId", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -1867,13 +1867,13 @@ void UserServiceClient::recv_RegisterUserWithId()
   return;
 }
 
-void UserServiceClient::Login(std::string& _return, const int64_t req_id, const std::string& username, const std::string& password, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::Login(std::string& _return, const int64_t req_id, const std::string& username, const std::string& password, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_Login(req_id, username, password, carrier);
   recv_Login(_return);
 }
 
-void UserServiceClient::send_Login(const int64_t req_id, const std::string& username, const std::string& password, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::send_Login(const int64_t req_id, const std::string& username, const std::string& password, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("Login", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -1931,13 +1931,13 @@ void UserServiceClient::recv_Login(std::string& _return)
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Login failed: unknown result");
 }
 
-void UserServiceClient::ComposeCreatorWithUserId(Creator& _return, const int64_t req_id, const int64_t user_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::ComposeCreatorWithUserId(Creator& _return, const int64_t req_id, const int64_t user_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_ComposeCreatorWithUserId(req_id, user_id, username, carrier);
   recv_ComposeCreatorWithUserId(_return);
 }
 
-void UserServiceClient::send_ComposeCreatorWithUserId(const int64_t req_id, const int64_t user_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::send_ComposeCreatorWithUserId(const int64_t req_id, const int64_t user_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("ComposeCreatorWithUserId", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -1995,13 +1995,13 @@ void UserServiceClient::recv_ComposeCreatorWithUserId(Creator& _return)
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ComposeCreatorWithUserId failed: unknown result");
 }
 
-void UserServiceClient::ComposeCreatorWithUsername(Creator& _return, const int64_t req_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::ComposeCreatorWithUsername(Creator& _return, const int64_t req_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_ComposeCreatorWithUsername(req_id, username, carrier);
   recv_ComposeCreatorWithUsername(_return);
 }
 
-void UserServiceClient::send_ComposeCreatorWithUsername(const int64_t req_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::send_ComposeCreatorWithUsername(const int64_t req_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("ComposeCreatorWithUsername", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -2058,13 +2058,13 @@ void UserServiceClient::recv_ComposeCreatorWithUsername(Creator& _return)
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ComposeCreatorWithUsername failed: unknown result");
 }
 
-int64_t UserServiceClient::GetUserId(const int64_t req_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+int64_t UserServiceClient::GetUserId(const int64_t req_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_GetUserId(req_id, username, carrier);
   return recv_GetUserId();
 }
 
-void UserServiceClient::send_GetUserId(const int64_t req_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+void UserServiceClient::send_GetUserId(const int64_t req_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("GetUserId", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -2487,13 +2487,13 @@ void UserServiceProcessor::process_GetUserId(int32_t seqid, ::apache::thrift::pr
   return processor;
 }
 
-void UserServiceConcurrentClient::RegisterUser(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const std::map<std::string, std::string> & carrier)
+void UserServiceConcurrentClient::RegisterUser(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_RegisterUser(req_id, first_name, last_name, username, password, carrier);
   recv_RegisterUser(seqid);
 }
 
-int32_t UserServiceConcurrentClient::send_RegisterUser(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const std::map<std::string, std::string> & carrier)
+int32_t UserServiceConcurrentClient::send_RegisterUser(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);
@@ -2574,13 +2574,13 @@ void UserServiceConcurrentClient::recv_RegisterUser(const int32_t seqid)
   } // end while(true)
 }
 
-void UserServiceConcurrentClient::RegisterUserWithId(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const int64_t user_id, const std::map<std::string, std::string> & carrier)
+void UserServiceConcurrentClient::RegisterUserWithId(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const int64_t user_id, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_RegisterUserWithId(req_id, first_name, last_name, username, password, user_id, carrier);
   recv_RegisterUserWithId(seqid);
 }
 
-int32_t UserServiceConcurrentClient::send_RegisterUserWithId(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const int64_t user_id, const std::map<std::string, std::string> & carrier)
+int32_t UserServiceConcurrentClient::send_RegisterUserWithId(const int64_t req_id, const std::string& first_name, const std::string& last_name, const std::string& username, const std::string& password, const int64_t user_id, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);
@@ -2662,13 +2662,13 @@ void UserServiceConcurrentClient::recv_RegisterUserWithId(const int32_t seqid)
   } // end while(true)
 }
 
-void UserServiceConcurrentClient::Login(std::string& _return, const int64_t req_id, const std::string& username, const std::string& password, const std::map<std::string, std::string> & carrier)
+void UserServiceConcurrentClient::Login(std::string& _return, const int64_t req_id, const std::string& username, const std::string& password, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_Login(req_id, username, password, carrier);
   recv_Login(_return, seqid);
 }
 
-int32_t UserServiceConcurrentClient::send_Login(const int64_t req_id, const std::string& username, const std::string& password, const std::map<std::string, std::string> & carrier)
+int32_t UserServiceConcurrentClient::send_Login(const int64_t req_id, const std::string& username, const std::string& password, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);
@@ -2753,13 +2753,13 @@ void UserServiceConcurrentClient::recv_Login(std::string& _return, const int32_t
   } // end while(true)
 }
 
-void UserServiceConcurrentClient::ComposeCreatorWithUserId(Creator& _return, const int64_t req_id, const int64_t user_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+void UserServiceConcurrentClient::ComposeCreatorWithUserId(Creator& _return, const int64_t req_id, const int64_t user_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_ComposeCreatorWithUserId(req_id, user_id, username, carrier);
   recv_ComposeCreatorWithUserId(_return, seqid);
 }
 
-int32_t UserServiceConcurrentClient::send_ComposeCreatorWithUserId(const int64_t req_id, const int64_t user_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+int32_t UserServiceConcurrentClient::send_ComposeCreatorWithUserId(const int64_t req_id, const int64_t user_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);
@@ -2844,13 +2844,13 @@ void UserServiceConcurrentClient::recv_ComposeCreatorWithUserId(Creator& _return
   } // end while(true)
 }
 
-void UserServiceConcurrentClient::ComposeCreatorWithUsername(Creator& _return, const int64_t req_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+void UserServiceConcurrentClient::ComposeCreatorWithUsername(Creator& _return, const int64_t req_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_ComposeCreatorWithUsername(req_id, username, carrier);
   recv_ComposeCreatorWithUsername(_return, seqid);
 }
 
-int32_t UserServiceConcurrentClient::send_ComposeCreatorWithUsername(const int64_t req_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+int32_t UserServiceConcurrentClient::send_ComposeCreatorWithUsername(const int64_t req_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);
@@ -2934,13 +2934,13 @@ void UserServiceConcurrentClient::recv_ComposeCreatorWithUsername(Creator& _retu
   } // end while(true)
 }
 
-int64_t UserServiceConcurrentClient::GetUserId(const int64_t req_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+int64_t UserServiceConcurrentClient::GetUserId(const int64_t req_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_GetUserId(req_id, username, carrier);
   return recv_GetUserId(seqid);
 }
 
-int32_t UserServiceConcurrentClient::send_GetUserId(const int64_t req_id, const std::string& username, const std::map<std::string, std::string> & carrier)
+int32_t UserServiceConcurrentClient::send_GetUserId(const int64_t req_id, const std::string& username, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);

@@ -1,3 +1,4 @@
+#include <format>
 #ifndef SOCIAL_NETWORK_MICROSERVICES_SRC_USERTIMELINESERVICE_USERTIMELINEHANDLER_H_
 #define SOCIAL_NETWORK_MICROSERVICES_SRC_USERTIMELINESERVICE_USERTIMELINEHANDLER_H_
 
@@ -5,6 +6,7 @@
 #include <mongoc.h>
 #include <sw/redis++/redis++.h>
 
+#include <algorithm>
 #include <future>
 #include <iostream>
 #include <string>
@@ -15,6 +17,7 @@
 #include "../ThriftClient.h"
 #include "../logger.h"
 #include "../tracing.h"
+#include "../transparent_hash.h"
 
 using namespace sw::redis;
 
@@ -36,10 +39,10 @@ class UserTimelineHandler : public UserTimelineServiceIf {
 
   void WriteUserTimeline(
       int64_t req_id, int64_t post_id, int64_t user_id, int64_t timestamp,
-      const std::map<std::string, std::string> &carrier) override;
+      const std::map<std::string, std::string, std::less<>> &carrier) override;
 
   void ReadUserTimeline(std::vector<Post> &, int64_t, int64_t, int, int,
-                        const std::map<std::string, std::string> &) override;
+                        const std::map<std::string, std::string, std::less<>> &) override;
 
  private:
   Redis *_redis_client_pool;
@@ -89,7 +92,7 @@ bool UserTimelineHandler::IsRedisReplicationEnabled() {
 
 void UserTimelineHandler::WriteUserTimeline(
     int64_t req_id, int64_t post_id, int64_t user_id, int64_t timestamp,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
@@ -185,7 +188,7 @@ void UserTimelineHandler::WriteUserTimeline(
 
 void UserTimelineHandler::ReadUserTimeline(
     std::vector<Post> &_return, int64_t req_id, int64_t user_id, int start,
-    int stop, const std::map<std::string, std::string> &carrier) {
+    int stop, const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
@@ -228,7 +231,7 @@ void UserTimelineHandler::ReadUserTimeline(
 
   // find in mongodb
   int mongo_start = start + post_ids.size();
-  std::unordered_map<std::string, double> redis_update_map;
+  std::unordered_map<std::string, double, TransparentStringHash, std::equal_to<>> redis_update_map;
   if (mongo_start < stop) {
     // Instead find post_ids from mongodb
     mongoc_client_t *mongodb_client =
@@ -269,12 +272,12 @@ void UserTimelineHandler::ReadUserTimeline(
       bson_iter_init(&iter_0, doc);
       bson_iter_init(&iter_1, doc);
       while (bson_iter_find_descendant(
-                 &iter_0, ("posts." + std::to_string(idx) + ".post_id").c_str(),
+                 &iter_0, std::format("posts.{}.post_id", idx).c_str(),
                  &post_id_child) &&
              BSON_ITER_HOLDS_INT64(&post_id_child) &&
              bson_iter_find_descendant(
                  &iter_1,
-                 ("posts." + std::to_string(idx) + ".timestamp").c_str(),
+                 std::format("posts.{}.timestamp", idx).c_str(),
                  &timestamp_child) &&
              BSON_ITER_HOLDS_INT64(&timestamp_child)) {
         auto curr_post_id = bson_iter_int64(&post_id_child);
@@ -282,7 +285,7 @@ void UserTimelineHandler::ReadUserTimeline(
         if (idx >= mongo_start) {
           //In mixed workload condition, post may composed between redis and mongo read
           //mongodb index will shift and duplicate post_id occurs
-          if ( std::find(post_ids.begin(), post_ids.end(), curr_post_id) == post_ids.end() ) {
+          if ( std::ranges::find(post_ids, curr_post_id) == post_ids.end() ) {
             post_ids.emplace_back(curr_post_id);
           }
         }
@@ -323,7 +326,7 @@ void UserTimelineHandler::ReadUserTimeline(
         return _return_posts;
       });
 
-  if (redis_update_map.size() > 0) {
+  if (!redis_update_map.empty()) {
     auto redis_update_span = opentracing::Tracer::Global()->StartSpan(
         "user_timeline_redis_update_client",
         {opentracing::ChildOf(&span->context())});

@@ -1,3 +1,4 @@
+#include <format>
 #ifndef SOCIAL_NETWORK_MICROSERVICES_POSTSTORAGEHANDLER_H
 #define SOCIAL_NETWORK_MICROSERVICES_POSTSTORAGEHANDLER_H
 
@@ -12,11 +13,44 @@
 #include <string>
 
 #include "../../gen-cpp/PostStorageService.h"
+#include "../bson_compat.h"
 #include "../logger.h"
 #include "../tracing.h"
 
 namespace social_network {
 using json = nlohmann::json;
+
+// Deserialise a stored post document (legacy-mode JSON) into a Post. Shared by
+// the memcached-hit and MongoDB-read paths to keep their complexity low.
+inline Post PostFromJson(const json &post_json) {
+  Post post;
+  post.req_id = post_json["req_id"];
+  post.timestamp = post_json["timestamp"];
+  post.post_id = post_json["post_id"];
+  post.creator.user_id = post_json["creator"]["user_id"];
+  post.creator.username = post_json["creator"]["username"];
+  post.post_type = post_json["post_type"];
+  post.text = post_json["text"];
+  for (auto &item : post_json["media"]) {
+    Media media;
+    media.media_id = item["media_id"];
+    media.media_type = item["media_type"];
+    post.media.emplace_back(media);
+  }
+  for (auto &item : post_json["user_mentions"]) {
+    UserMention user_mention;
+    user_mention.username = item["username"];
+    user_mention.user_id = item["user_id"];
+    post.user_mentions.emplace_back(user_mention);
+  }
+  for (auto &item : post_json["urls"]) {
+    Url url;
+    url.shortened_url = item["shortened_url"];
+    url.expanded_url = item["expanded_url"];
+    post.urls.emplace_back(url);
+  }
+  return post;
+}
 
 class PostStorageHandler : public PostStorageServiceIf {
  public:
@@ -24,14 +58,14 @@ class PostStorageHandler : public PostStorageServiceIf {
   ~PostStorageHandler() override = default;
 
   void StorePost(int64_t req_id, const Post &post,
-                 const std::map<std::string, std::string> &carrier) override;
+                 const std::map<std::string, std::string, std::less<>> &carrier) override;
 
   void ReadPost(Post &_return, int64_t req_id, int64_t post_id,
-                const std::map<std::string, std::string> &carrier) override;
+                const std::map<std::string, std::string, std::less<>> &carrier) override;
 
   void ReadPosts(std::vector<Post> &_return, int64_t req_id,
                  const std::vector<int64_t> &post_ids,
-                 const std::map<std::string, std::string> &carrier) override;
+                 const std::map<std::string, std::string, std::less<>> &carrier) override;
 
  private:
   memcached_pool_st *_memcached_client_pool;
@@ -47,7 +81,7 @@ PostStorageHandler::PostStorageHandler(
 
 void PostStorageHandler::StorePost(
     int64_t req_id, const social_network::Post &post,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
@@ -91,12 +125,12 @@ void PostStorageHandler::StorePost(
 
   const char *key;
   int idx = 0;
-  char buf[16];
+  std::string buf(16, 0);
 
   bson_t url_list;
   BSON_APPEND_ARRAY_BEGIN(new_doc, "urls", &url_list);
   for (auto &url : post.urls) {
-    bson_uint32_to_string(idx, &key, buf, sizeof buf);
+    bson_uint32_to_string(idx, &key, buf.data(), buf.size());
     bson_t url_doc;
     BSON_APPEND_DOCUMENT_BEGIN(&url_list, key, &url_doc);
     BSON_APPEND_UTF8(&url_doc, "shortened_url", url.shortened_url.c_str());
@@ -110,7 +144,7 @@ void PostStorageHandler::StorePost(
   idx = 0;
   BSON_APPEND_ARRAY_BEGIN(new_doc, "user_mentions", &user_mention_list);
   for (auto &user_mention : post.user_mentions) {
-    bson_uint32_to_string(idx, &key, buf, sizeof buf);
+    bson_uint32_to_string(idx, &key, buf.data(), buf.size());
     bson_t user_mention_doc;
     BSON_APPEND_DOCUMENT_BEGIN(&user_mention_list, key, &user_mention_doc);
     BSON_APPEND_INT64(&user_mention_doc, "user_id", user_mention.user_id);
@@ -125,7 +159,7 @@ void PostStorageHandler::StorePost(
   idx = 0;
   BSON_APPEND_ARRAY_BEGIN(new_doc, "media", &media_list);
   for (auto &media : post.media) {
-    bson_uint32_to_string(idx, &key, buf, sizeof buf);
+    bson_uint32_to_string(idx, &key, buf.data(), buf.size());
     bson_t media_doc;
     BSON_APPEND_DOCUMENT_BEGIN(&media_list, key, &media_doc);
     BSON_APPEND_INT64(&media_doc, "media_id", media.media_id);
@@ -163,7 +197,7 @@ void PostStorageHandler::StorePost(
 
 void PostStorageHandler::ReadPost(
     Post &_return, int64_t req_id, int64_t post_id,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
@@ -189,9 +223,10 @@ void PostStorageHandler::ReadPost(
   uint32_t memcached_flags;
   auto get_span = opentracing::Tracer::Global()->StartSpan(
       "post_storage_mmc_get_client", {opentracing::ChildOf(&span->context())});
-  std::unique_ptr<char, decltype(std::free)*> post_mmc_guard(
+  std::unique_ptr<char, void (*)(char *)> post_mmc_guard(
       memcached_get(memcached_client, post_id_str.c_str(), post_id_str.length(),
-                    &post_mmc_size, &memcached_flags, &memcached_rc), std::free);
+                    &post_mmc_size, &memcached_flags, &memcached_rc),
+      [](char *p) { std::free(p); });
   char *post_mmc = post_mmc_guard.get();
   if (!post_mmc && memcached_rc != MEMCACHED_NOTFOUND) {
     ServiceException se;
@@ -207,31 +242,7 @@ void PostStorageHandler::ReadPost(
     LOG(debug) << "Get post " << post_id << " cache hit from Memcached";
     json post_json =
         json::parse(std::string(post_mmc, post_mmc + post_mmc_size));
-    _return.req_id = post_json["req_id"];
-    _return.timestamp = post_json["timestamp"];
-    _return.post_id = post_json["post_id"];
-    _return.creator.user_id = post_json["creator"]["user_id"];
-    _return.creator.username = post_json["creator"]["username"];
-    _return.post_type = post_json["post_type"];
-    _return.text = post_json["text"];
-    for (auto &item : post_json["media"]) {
-      Media media;
-      media.media_id = item["media_id"];
-      media.media_type = item["media_type"];
-      _return.media.emplace_back(media);
-    }
-    for (auto &item : post_json["user_mentions"]) {
-      UserMention user_mention;
-      user_mention.username = item["username"];
-      user_mention.user_id = item["user_id"];
-      _return.user_mentions.emplace_back(user_mention);
-    }
-    for (auto &item : post_json["urls"]) {
-      Url url;
-      url.shortened_url = item["shortened_url"];
-      url.expanded_url = item["expanded_url"];
-      _return.urls.emplace_back(url);
-    }
+    _return = PostFromJson(post_json);
   } else {
     // If not cached in memcached
     mongoc_client_t *mongodb_client =
@@ -284,38 +295,14 @@ void PostStorageHandler::ReadPost(
         ServiceException se;
         se.errorCode = ErrorCode::SE_THRIFT_HANDLER_ERROR;
         se.message =
-            "Post_id: " + std::to_string(post_id) + " doesn't exist in MongoDB";
+            std::format("Post_id: {} doesn't exist in MongoDB", post_id);
         throw se;
       }
     } else {
       LOG(debug) << "Post_id: " << post_id << " found in MongoDB";
-      auto post_json_char = bson_as_json(doc, nullptr);
+      auto post_json_char = bson_as_json_legacy(doc, nullptr);
       json post_json = json::parse(post_json_char);
-      _return.req_id = post_json["req_id"];
-      _return.timestamp = post_json["timestamp"];
-      _return.post_id = post_json["post_id"];
-      _return.creator.user_id = post_json["creator"]["user_id"];
-      _return.creator.username = post_json["creator"]["username"];
-      _return.post_type = post_json["post_type"];
-      _return.text = post_json["text"];
-      for (auto &item : post_json["media"]) {
-        Media media;
-        media.media_id = item["media_id"];
-        media.media_type = item["media_type"];
-        _return.media.emplace_back(media);
-      }
-      for (auto &item : post_json["user_mentions"]) {
-        UserMention user_mention;
-        user_mention.username = item["username"];
-        user_mention.user_id = item["user_id"];
-        _return.user_mentions.emplace_back(user_mention);
-      }
-      for (auto &item : post_json["urls"]) {
-        Url url;
-        url.shortened_url = item["shortened_url"];
-        url.expanded_url = item["expanded_url"];
-        _return.urls.emplace_back(url);
-      }
+      _return = PostFromJson(post_json);
       bson_destroy(query);
       mongoc_cursor_destroy(cursor);
       mongoc_collection_destroy(collection);
@@ -353,7 +340,7 @@ void PostStorageHandler::ReadPost(
 void PostStorageHandler::ReadPosts(
     std::vector<Post> &_return, int64_t req_id,
     const std::vector<int64_t> &post_ids,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
@@ -395,7 +382,7 @@ void PostStorageHandler::ReadPosts(
   for (auto &post_id : post_ids) {
     std::string key_str = std::to_string(post_id);
     keys[idx] = new char[key_str.length() + 1];
-    strcpy(keys[idx], key_str.c_str());
+    memcpy(keys[idx], key_str.c_str(), key_str.length() + 1);
     key_sizes[idx] = key_str.length();
     idx++;
   }
@@ -423,7 +410,8 @@ void PostStorageHandler::ReadPosts(
     return_value =
         memcached_fetch(memcached_client, return_key, &return_key_length,
                         &return_value_length, &flags, &memcached_rc);
-    std::unique_ptr<char, decltype(std::free)*> rv_guard(return_value, std::free);
+    std::unique_ptr<char, void (*)(char *)> rv_guard(return_value,
+                                                     [](char *p) { std::free(p); });
     if (return_value == nullptr) {
       LOG(debug) << "Memcached mget finished";
       break;
@@ -434,7 +422,7 @@ void PostStorageHandler::ReadPosts(
       LOG(error) << "Cannot get posts of request " << req_id;
       ServiceException se;
       se.errorCode = ErrorCode::SE_MEMCACHED_ERROR;
-      se.message = "Cannot get posts of request " + std::to_string(req_id);
+      se.message = std::format("Cannot get posts of request {}", req_id);
       throw se;
     }
     Post new_post;
@@ -504,12 +492,12 @@ void PostStorageHandler::ReadPosts(
     bson_t query_post_id_list;
     const char *key;
     idx = 0;
-    char buf[16];
+    std::string buf(16, 0);
 
     BSON_APPEND_DOCUMENT_BEGIN(query, "post_id", &query_child);
     BSON_APPEND_ARRAY_BEGIN(&query_child, "$in", &query_post_id_list);
     for (auto &item : post_ids_not_cached) {
-      bson_uint32_to_string(idx, &key, buf, sizeof buf);
+      bson_uint32_to_string(idx, &key, buf.data(), buf.size());
       BSON_APPEND_INT64(&query_post_id_list, key, item);
       idx++;
     }
@@ -527,7 +515,7 @@ void PostStorageHandler::ReadPosts(
         break;
       }
       Post new_post;
-      char *post_json_char = bson_as_json(doc, nullptr);
+      char *post_json_char = bson_as_json_legacy(doc, nullptr);
       json post_json = json::parse(post_json_char);
       new_post.req_id = post_json["req_id"];
       new_post.timestamp = post_json["timestamp"];
@@ -554,7 +542,7 @@ void PostStorageHandler::ReadPosts(
         url.expanded_url = item["expanded_url"];
         new_post.urls.emplace_back(url);
       }
-      post_json_map.try_emplace(new_post.post_id, std::string(post_json_char));
+      post_json_map.try_emplace(new_post.post_id, post_json_char);
       return_map.try_emplace(new_post.post_id, new_post);
       bson_free(post_json_char);
     }
@@ -590,10 +578,10 @@ void PostStorageHandler::ReadPosts(
       }
       auto set_span = opentracing::Tracer::Global()->StartSpan(
           "mmc_set_client", {opentracing::ChildOf(&span->context())});
-      for (auto &it : post_json_map) {
-        std::string id_str = std::to_string(it.first);
+      for (auto &[post_id, post_json] : post_json_map) {
+        std::string id_str = std::to_string(post_id);
         _rc = memcached_set(_memcached_client, id_str.c_str(), id_str.length(),
-                            it.second.c_str(), it.second.length(),
+                            post_json.c_str(), post_json.length(),
                             static_cast<time_t>(0), static_cast<uint32_t>(0));
       }
       memcached_pool_push(_memcached_client_pool, _memcached_client);
@@ -606,8 +594,8 @@ void PostStorageHandler::ReadPosts(
       for (auto &it : set_futures) {
         it.get();
       }
-    } catch (...) {
-      LOG(warning) << "Failed to set posts to memcached";
+    } catch (const ServiceException &e) {
+      LOG(warning) << "Failed to set posts to memcached: " << e.what();
     }
     LOG(error) << "Return set incomplete";
     ServiceException se;

@@ -1,3 +1,5 @@
+#include <format>
+#include <cstddef>
 #ifndef SOCIAL_NETWORK_MICROSERVICES_USERHANDLER_H
 #define SOCIAL_NETWORK_MICROSERVICES_USERHANDLER_H
 
@@ -23,8 +25,8 @@
 #include "../tracing.h"
 
 // Custom Epoch (January 1, 2018 Midnight GMT = 2018-01-01T00:00:00Z)
-#define CUSTOM_EPOCH 1514764800000
-#define MONGODB_TIMEOUT_MS 100
+static constexpr long long CUSTOM_EPOCH = 1514764800000LL;
+static constexpr int MONGODB_TIMEOUT_MS = 100;
 
 namespace social_network {
 
@@ -32,12 +34,10 @@ using std::chrono::duration_cast;
 using std::chrono::milliseconds;
 using std::chrono::seconds;
 using std::chrono::system_clock;
-using namespace jwt::params;
-
-static int64_t current_timestamp = -1;
-static int counter = 0;
 
 static int GetCounter(int64_t timestamp) {
+  static thread_local int64_t current_timestamp = -1;
+  static thread_local int counter = 0;
   if (current_timestamp > timestamp) {
     LOG(fatal) << "Timestamps are not incremental.";
     exit(EXIT_FAILURE);
@@ -58,7 +58,7 @@ std::string GenRandomString(const int len) {
       "abcdefghijklmnopqrstuvwxyz";
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_int_distribution<int> dist(
+  std::uniform_int_distribution dist(
       0, static_cast<int>(alphanum.length() - 1));
   std::string s;
   for (int i = 0; i < len; ++i) {
@@ -75,21 +75,21 @@ class UserHandler : public UserServiceIf {
   ~UserHandler() override = default;
   void RegisterUser(int64_t, const std::string &, const std::string &,
                     const std::string &, const std::string &,
-                    const std::map<std::string, std::string> &) override;
+                    const std::map<std::string, std::string, std::less<>> &) override;
   void RegisterUserWithId(int64_t, const std::string &, const std::string &,
                           const std::string &, const std::string &, int64_t,
-                          const std::map<std::string, std::string> &) override;
+                          const std::map<std::string, std::string, std::less<>> &) override;
 
   void ComposeCreatorWithUserId(
       Creator &, int64_t, int64_t, const std::string &,
-      const std::map<std::string, std::string> &) override;
+      const std::map<std::string, std::string, std::less<>> &) override;
   void ComposeCreatorWithUsername(
       Creator &, int64_t, const std::string &,
-      const std::map<std::string, std::string> &) override;
+      const std::map<std::string, std::string, std::less<>> &) override;
   void Login(std::string &, int64_t, const std::string &, const std::string &,
-             const std::map<std::string, std::string> &) override;
+             const std::map<std::string, std::string, std::less<>> &) override;
   int64_t GetUserId(int64_t, const std::string &,
-                    const std::map<std::string, std::string> &) override;
+                    const std::map<std::string, std::string, std::less<>> &) override;
 
  private:
   std::string _machine_id;
@@ -118,7 +118,7 @@ void UserHandler::RegisterUserWithId(
     const int64_t req_id, const std::string &first_name,
     const std::string &last_name, const std::string &username,
     const std::string &password, const int64_t user_id,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
@@ -190,7 +190,7 @@ void UserHandler::RegisterUserWithId(
       ServiceException se;
       se.errorCode = ErrorCode::SE_THRIFT_HANDLER_ERROR;
       se.message =
-          "Failed to insert user " + username + " to MongoDB: " + error.message;
+          std::format("Failed to insert user {} to MongoDB: {}", username, error.message);
       bson_destroy(query);
       mongoc_cursor_destroy(cursor);
       mongoc_collection_destroy(collection);
@@ -233,7 +233,7 @@ void UserHandler::RegisterUser(
     const int64_t req_id, const std::string &first_name,
     const std::string &last_name, const std::string &username,
     const std::string &password,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
@@ -337,7 +337,7 @@ void UserHandler::RegisterUser(
       ServiceException se;
       se.errorCode = ErrorCode::SE_THRIFT_HANDLER_ERROR;
       se.message =
-          "Failed to insert user " + username + " to MongoDB: " + error.message;
+          std::format("Failed to insert user {} to MongoDB: {}", username, error.message);
       bson_destroy(query);
       mongoc_cursor_destroy(cursor);
       mongoc_collection_destroy(collection);
@@ -379,7 +379,7 @@ void UserHandler::RegisterUser(
 
 void UserHandler::ComposeCreatorWithUsername(
     Creator &_return, const int64_t req_id, const std::string &username,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
@@ -394,7 +394,7 @@ void UserHandler::ComposeCreatorWithUsername(
   memcached_return_t memcached_rc;
   memcached_st *memcached_client =
       memcached_pool_pop(_memcached_client_pool, true, &memcached_rc);
-  std::unique_ptr<char, decltype(std::free)*> user_id_mmc_guard(nullptr, std::free);
+  std::unique_ptr<char, void (*)(char *)> user_id_mmc_guard(nullptr, [](char *p) { std::free(p); });
   char *user_id_mmc = nullptr;
   if (memcached_client) {
     auto id_get_span = opentracing::Tracer::Global()->StartSpan(
@@ -539,7 +539,7 @@ void UserHandler::ComposeCreatorWithUsername(
 void UserHandler::ComposeCreatorWithUserId(
     Creator &_return, int64_t req_id, int64_t user_id,
     const std::string &username,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
@@ -560,7 +560,7 @@ void UserHandler::ComposeCreatorWithUserId(
 void UserHandler::Login(std::string &_return, int64_t req_id,
                         const std::string &username,
                         const std::string &password,
-                        const std::map<std::string, std::string> &carrier) {
+                        const std::map<std::string, std::string, std::less<>> &carrier) {
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
@@ -575,7 +575,7 @@ void UserHandler::Login(std::string &_return, int64_t req_id,
   memcached_return_t memcached_rc;
   memcached_st *memcached_client =
       memcached_pool_pop(_memcached_client_pool, true, &memcached_rc);
-  std::unique_ptr<char, decltype(std::free)*> login_mmc_guard(nullptr, std::free);
+  std::unique_ptr<char, void (*)(char *)> login_mmc_guard(nullptr, [](char *p) { std::free(p); });
   char *login_mmc = nullptr;
   if (!memcached_client) {
     LOG(warning) << "Failed to pop a client from memcached pool";
@@ -706,11 +706,12 @@ void UserHandler::Login(std::string &_return, int64_t req_id,
       auto timestamp_str = std::to_string(
           duration_cast<seconds>(system_clock::now().time_since_epoch())
               .count());
-      jwt::jwt_object obj{algorithm("HS256"), secret(_secret),
-                          payload({{"user_id", user_id_str},
-                                   {"username", username},
-                                   {"timestamp", timestamp_str},
-                                   {"ttl", "3600"}})};
+      jwt::jwt_object obj{jwt::params::algorithm("HS256"),
+                          jwt::params::secret(_secret),
+                          jwt::params::payload({{"user_id", user_id_str},
+                                                {"username", username},
+                                                {"timestamp", timestamp_str},
+                                                {"ttl", "3600"}})};
       _return = obj.signature();
     } else {
       ServiceException se;
@@ -751,7 +752,7 @@ void UserHandler::Login(std::string &_return, int64_t req_id,
 }
 int64_t UserHandler::GetUserId(
     int64_t req_id, const std::string &username,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
@@ -766,7 +767,7 @@ int64_t UserHandler::GetUserId(
   memcached_return_t memcached_rc;
   memcached_st *memcached_client =
       memcached_pool_pop(_memcached_client_pool, true, &memcached_rc);
-  std::unique_ptr<char, decltype(std::free)*> user_id_mmc2_guard(nullptr, std::free);
+  std::unique_ptr<char, void (*)(char *)> user_id_mmc2_guard(nullptr, [](char *p) { std::free(p); });
   char *user_id_mmc = nullptr;
   if (memcached_client) {
     auto id_get_span = opentracing::Tracer::Global()->StartSpan(
@@ -908,9 +909,9 @@ int64_t UserHandler::GetUserId(
  */
 u_int16_t HashMacAddressPid(const std::string &mac) {
   u_int16_t hash = 0;
-  std::string mac_pid = mac + std::to_string(getpid());
+  std::string mac_pid = std::format("{}{}", mac, getpid());
   for (unsigned int i = 0; i < mac_pid.size(); i++) {
-    hash += (mac[i] << ((i & 1) * 8));
+    hash += static_cast<u_int16_t>(std::to_integer<uint16_t>(static_cast<std::byte>(mac[i])) << ((i & 1) * 8));
   }
   return hash;
 }
