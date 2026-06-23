@@ -1,0 +1,2 @@
+"$SCRIPTS_FOLDER/printLog.sh" "DEBUG" "COI-set-up" "SUT is vendored under sut/, no fetch required"
+
