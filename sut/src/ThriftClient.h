@@ -5,6 +5,7 @@
 #include <thread>
 #include <iostream>
 #include <chrono>
+#include <memory>
 #include <boost/log/trivial.hpp>
 
 #include <thrift/protocol/TBinaryProtocol.h>
@@ -29,15 +30,15 @@ using apache::thrift::TException;
 using json = nlohmann::json;
 
 template<class TThriftClient>
-class ThriftClient : public GenericClient {
+class ThriftClient final : public GenericClient {
  public:
   ThriftClient(const std::string &addr, int port);
   ThriftClient(const std::string &addr, int port, int keepalive_ms, const json &config_json);
 
   ThriftClient(const ThriftClient &) = delete;
   ThriftClient &operator=(const ThriftClient &) = delete;
-  ThriftClient(ThriftClient<TThriftClient> &&) = default;
-  ThriftClient &operator=(ThriftClient &&) = default;
+  ThriftClient(ThriftClient<TThriftClient> &&) noexcept = default;
+  ThriftClient &operator=(ThriftClient &&) noexcept = default;
 
   ~ThriftClient() override;
 
@@ -48,7 +49,7 @@ class ThriftClient : public GenericClient {
   bool IsConnected() override;
 
  private:
-  TThriftClient *_client;
+  std::unique_ptr<TThriftClient> _client;
 
   std::shared_ptr<TSocket> _socket;
   std::shared_ptr<TTransport> _transport;
@@ -57,23 +58,19 @@ class ThriftClient : public GenericClient {
 
 template<class TThriftClient>
 ThriftClient<TThriftClient>::ThriftClient(
-    const std::string &addr, int port) {
-  _addr = addr;
-  _port = port;
-  _socket = std::shared_ptr<TSocket>(new TSocket(addr, port));
+    const std::string &addr, int port)
+    : GenericClient(addr, port),
+      _socket(std::make_shared<TSocket>(addr, port)),
+      _transport(std::make_shared<TFramedTransport>(_socket)),
+      _protocol(std::make_shared<TBinaryProtocol>(_transport)),
+      _client(std::make_unique<TThriftClient>(_protocol)) {
   _socket->setKeepAlive(true);
-  _transport = std::shared_ptr<TTransport>(new TFramedTransport(_socket));
-  _protocol = std::shared_ptr<TProtocol>(new TBinaryProtocol(_transport));
-  _client = new TThriftClient(_protocol);
-  _connect_timestamp = 0;
-  _keepalive_ms = 0;
 }
 
 template <class TThriftClient>
 ThriftClient<TThriftClient>::ThriftClient(
-    const std::string &addr, int port, int keepalive_ms, const json &config_json) {
-  _addr = addr;
-  _port = port;
+    const std::string &addr, int port, int keepalive_ms, const json &config_json)
+    : GenericClient(addr, port) {
   bool ssl_enabled = config_json["ssl"]["enabled"];
 
   if (ssl_enabled) {
@@ -88,27 +85,26 @@ ThriftClient<TThriftClient>::ThriftClient(
     factory->authenticate(true);
     _socket = factory->createSocket(addr, port);
   } else {
-    _socket = std::shared_ptr<TSocket>(new TSocket(addr, port));
+    _socket = std::make_shared<TSocket>(addr, port);
   }
   _socket->setKeepAlive(true);
-  _transport = std::shared_ptr<TTransport>(new TFramedTransport(_socket));
-  _protocol = std::shared_ptr<TProtocol>(new TBinaryProtocol(_transport));
-  _client = new TThriftClient(_protocol);
-  _connect_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                           std::chrono::system_clock::now().time_since_epoch())
-                           .count();
-  _keepalive_ms = keepalive_ms;
+  _transport = std::make_shared<TFramedTransport>(_socket);
+  _protocol = std::make_shared<TBinaryProtocol>(_transport);
+  _client = std::make_unique<TThriftClient>(_protocol);
+  set_connect_timestamp(std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::system_clock::now().time_since_epoch())
+                            .count());
+  set_keepalive_ms(keepalive_ms);
 }
 
 template<class TThriftClient>
 ThriftClient<TThriftClient>::~ThriftClient() {
   Disconnect();
-  delete _client;
 }
 
 template<class TThriftClient>
 TThriftClient *ThriftClient<TThriftClient>::GetClient() const {
-  return _client;
+  return _client.get();
 }
 
 template<class TThriftClient>

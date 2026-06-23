@@ -37,11 +37,11 @@ class HomeTimelineHandler : public HomeTimelineServiceIf {
   bool IsRedisReplicationEnabled();
 
   void ReadHomeTimeline(std::vector<Post> &, int64_t, int64_t, int, int,
-                        const std::map<std::string, std::string> &) override;
+                        const std::map<std::string, std::string, std::less<>> &) override;
 
   void WriteHomeTimeline(int64_t, int64_t, int64_t, int64_t,
                          const std::vector<int64_t> &,
-                         const std::map<std::string, std::string> &) override;
+                         const std::map<std::string, std::string, std::less<>> &) override;
 
  private:
      Redis *_redis_replica_pool;
@@ -99,7 +99,7 @@ bool HomeTimelineHandler::IsRedisReplicationEnabled() {
 void HomeTimelineHandler::WriteHomeTimeline(
     int64_t req_id, int64_t post_id, int64_t user_id, int64_t timestamp,
     const std::vector<int64_t> &user_mentions_id,
-    const std::map<std::string, std::string> &carrier) {
+    const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
@@ -183,7 +183,7 @@ void HomeTimelineHandler::WriteHomeTimeline(
         auto pipe = pipe_map.find(conn);
         if(pipe == pipe_map.end()) {//Not found, create new pipeline and insert
           auto new_pipe = std::make_shared<Pipeline>(_redis_cluster_client_pool->pipeline(std::to_string(follower_id), false));
-          pipe_map.try_emplace(conn, new_pipe);
+          pipe_map.emplace(conn, new_pipe);
           auto *_pipe = new_pipe.get();
           _pipe->zadd(std::to_string(follower_id), post_id_str, timestamp,
                   UpdateType::NOT_EXIST);
@@ -212,7 +212,7 @@ void HomeTimelineHandler::WriteHomeTimeline(
 
 void HomeTimelineHandler::ReadHomeTimeline(
     std::vector<Post> &_return, int64_t req_id, int64_t user_id, int start_idx,
-    int stop_idx, const std::map<std::string, std::string> &carrier) {
+    int stop_idx, const std::map<std::string, std::string, std::less<>> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;

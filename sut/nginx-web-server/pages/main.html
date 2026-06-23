@@ -8,12 +8,12 @@
     <title>DeathStar</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
         integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous" />
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.7/css/all.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+        integrity="sha384-DyZ88mC6Up2uqS4h/KRgHuoeGwBcD4Ng9SiP4dIRy0EXTlnuz47vAwmeGwVChigm" crossorigin="anonymous" />
     <link rel="stylesheet" href="style/main.css" />
     <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet"
         integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous" />
     <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
-    <script src="http://maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
 
 </head>
 
@@ -61,16 +61,17 @@
                     </li>
 
                     <li class="nav-item dropdown ">
-                        <a class="nav-link dropdown-toggle text-white user-name" href="#" id="navbarDropdown"
-                            role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button class="btn btn-link nav-link dropdown-toggle text-white user-name p-0"
+                            id="navbarDropdown" type="button"
+                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                             <i class="fas fa-user"></i>
                             <div id="username" style="display: inline;"></div>
-                        </a>
+                        </button>
 
                         <div class="dropdown-menu" aria-labelledby="navbarDropdown">
                             <a class="dropdown-item" href="./profile.html">Profile & Setting</a>
                             <div class="dropdown-divider"></div>
-                            <a class="dropdown-item text-danger" onClick="logout();">Logout</a>
+                            <button type="button" class="dropdown-item text-danger" onclick="logout();">Logout</button>
                         </div>
                     </li>
                 </ul>
@@ -85,7 +86,7 @@
                         <h2 class="text-center">Create post</h2>
 
                         <div class="form-group">
-                            <textarea id="post-content" rows="8" class="form-control" name="description"></textarea>
+                            <textarea id="post-content" rows="8" class="form-control" name="description" aria-label="Post content"></textarea>
                         </div>
                         <form id="media-form" method="POST" enctype="multipart/form-data">
                             <label for="media">Choose images/videos to upload</label>
@@ -129,7 +130,7 @@
                             <p class="card-text post-text">
                                 Start by following someone you know!
                             </p>
-                            <img class="post-img" src="">
+                            <img class="post-img" src="" alt="">
                         </div>
                         <div class="card-footer post-footer">
                             <a href="#" class="card-link"> Edit </a>
@@ -155,7 +156,7 @@
                                         </a>
                                     </div>
                                     <div class="col-md-4 follow">
-                                        <form action="api/user/follow" id="follow-form" method="POST"
+                                        <form action="api/user/follow" method="POST"
                                             enctype="application/x-www-form-urlencoded">
                                             <input type="hidden" class="form-control mb-2" name="followee_name"
                                                 value="mark">
@@ -175,7 +176,7 @@
                                         </a>
                                     </div>
                                     <div class="col-md-4 follow">
-                                        <form action="api/user/follow" id="follow-form" method="POST"
+                                        <form action="api/user/follow" method="POST"
                                             enctype="application/x-www-form-urlencoded">
                                             <input type="hidden" class="form-control mb-2" name="followee_name"
                                                 value="elon">
@@ -195,7 +196,7 @@
                                         </a>
                                     </div>
                                     <div class="col-md-4 follow">
-                                        <form action="api/user/follow" id="follow-form" method="POST"
+                                        <form action="api/user/follow" method="POST"
                                             enctype="application/x-www-form-urlencoded">
                                             <input type="hidden" class="form-control mb-2" name="followee_name"
                                                 value="bill">

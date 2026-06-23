@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <title>My Awesome Login Page</title>
@@ -7,7 +7,6 @@
     integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous" />
   <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.1/css/all.css"
     integrity="sha384-gfdkjb5BdAXd+lj+gudLWI+BXq4IuLW5IT+brZEZsLFm++aCMlF1V92rMkPaX4PP" crossorigin="anonymous" />
-  <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css" />
   <link href="https://fonts.font.im/css?family=Kaushan+Script" rel="stylesheet" />
   <link rel="stylesheet" href="./style/login.css" />
 </head>
@@ -33,13 +32,13 @@
               <div class="input-group-append">
                 <span class="input-group-text"><i class="fas fa-user"></i></span>
               </div>
-              <input type="text" name="username" class="form-control input_user" placeholder="User Name" />
+              <input type="text" id="login-username" name="username" class="form-control input_user" placeholder="User Name" aria-label="User Name" />
             </div>
             <div class="input-group mb-2">
               <div class="input-group-append">
                 <span class="input-group-text"><i class="fas fa-key"></i></span>
               </div>
-              <input type="password" name="password" class="form-control input_pass " placeholder="Password" />
+              <input type="password" id="login-password" name="password" class="form-control input_pass " placeholder="Password" aria-label="Password" />
             </div>
           </form>
         </div>

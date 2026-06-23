@@ -1,10 +1,11 @@
+#include <format>
 #ifndef SOCIAL_NETWORK_MICROSERVICES_SRC_UTILS_MONGODB_H_
 #define SOCIAL_NETWORK_MICROSERVICES_SRC_UTILS_MONGODB_H_
 
 #include <mongoc.h>
 #include <bson/bson.h>
 
-#define SERVER_SELECTION_TIMEOUT_MS 300
+static constexpr int SERVER_SELECTION_TIMEOUT_MS = 300;
 
 namespace social_network {
 
@@ -15,10 +16,10 @@ mongoc_client_pool_t* init_mongodb_client_pool(
 ) {
   std::string addr = config_json[service_name + "-mongodb"]["addr"];
   int port = config_json[service_name + "-mongodb"]["port"];
-  std::string uri_str = "mongodb://" + addr + ":" +
-      std::to_string(port) + "/?appname=" + service_name + "-service";
-  uri_str += "&" MONGOC_URI_SERVERSELECTIONTIMEOUTMS "="
-      + std::to_string(SERVER_SELECTION_TIMEOUT_MS);
+  std::string uri_str = std::format("mongodb://{}:{}/?appname={}-service",
+      addr, port, service_name);
+  uri_str += std::format("&{}={}", MONGOC_URI_SERVERSELECTIONTIMEOUTMS,
+      SERVER_SELECTION_TIMEOUT_MS);
 
   mongoc_init();
   bson_error_t error;

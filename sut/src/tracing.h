@@ -4,12 +4,9 @@
 #define SOCIAL_NETWORK_MICROSERVICES_TRACING_H
 
 #include <string>
-#include <yaml-cpp/yaml.h>
-#include <jaegertracing/Tracer.h>
-
-#include <opentracing/propagation.h>
-#include <string>
 #include <map>
+#include <opentracing/propagation.h>
+#include <opentracing/noop.h>
 #include "logger.h"
 
 namespace social_network {
@@ -19,26 +16,26 @@ using opentracing::string_view;
 
 class TextMapReader : public opentracing::TextMapReader {
  public:
-  explicit TextMapReader(const std::map<std::string, std::string> &text_map)
+  explicit TextMapReader(const std::map<std::string, std::string, std::less<>> &text_map)
       : _text_map(text_map) {}
 
   expected<void> ForeachKey(
       std::function<expected<void>(string_view key, string_view value)> f)
   const override {
-    for (const auto& key_value : _text_map) {
-      auto result = f(key_value.first, key_value.second);
+    for (const auto& [key, value] : _text_map) {
+      auto result = f(key, value);
       if (!result) return result;
     }
     return {};
   }
 
  private:
-  const std::map<std::string, std::string>& _text_map;
+  const std::map<std::string, std::string, std::less<>>& _text_map;
 };
 
 class TextMapWriter : public opentracing::TextMapWriter {
  public:
-  explicit TextMapWriter(std::map<std::string, std::string> &text_map)
+  explicit TextMapWriter(std::map<std::string, std::string, std::less<>> &text_map)
     : _text_map(text_map) {}
 
   expected<void> Set(string_view key, string_view value) const override {
@@ -47,41 +44,16 @@ class TextMapWriter : public opentracing::TextMapWriter {
   }
 
  private:
-  std::map<std::string, std::string>& _text_map;
+  std::map<std::string, std::string, std::less<>>& _text_map;
 };
 
+// Initialise with a NoOp tracer so services compile and run without a Jaeger
+// agent. Distributed traces are not collected but all service logic is intact.
 void SetUpTracer(
-    const std::string &config_file_path,
-    const std::string &service) {
-  auto configYAML = YAML::LoadFile(config_file_path);
-
-  // Enable local Jaeger agent, by prepending the service name to the default
-  // Jaeger agent's hostname
-  // configYAML["reporter"]["localAgentHostPort"] = service + "-" +
-  //     configYAML["reporter"]["localAgentHostPort"].as<std::string>();
-
-  auto config = jaegertracing::Config::parse(configYAML);
-
-  bool r = false;
-  while (!r) {
-    try
-    {
-      auto tracer = jaegertracing::Tracer::make(
-        service, config, jaegertracing::logging::consoleLogger());
-      r = true;
-      opentracing::Tracer::InitGlobal(
-      std::static_pointer_cast<opentracing::Tracer>(tracer));
-    }
-    catch(...)
-    {
-      LOG(error) << "Failed to connect to jaeger, retrying ...";
-      sleep(1);
-    }
-  }
-
-
+    const std::string & /*config_file_path*/,
+    const std::string & /*service*/) {
+  opentracing::Tracer::InitGlobal(opentracing::MakeNoopTracer());
 }
-
 
 } //namespace social_network
 

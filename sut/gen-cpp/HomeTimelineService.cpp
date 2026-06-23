@@ -125,7 +125,7 @@ uint32_t HomeTimelineService_ReadHomeTimeline_args::write(::apache::thrift::prot
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 5);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter197;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter197;
     for (_iter197 = this->carrier.begin(); _iter197 != this->carrier.end(); ++_iter197)
     {
       xfer += oprot->writeString(_iter197->first);
@@ -169,7 +169,7 @@ uint32_t HomeTimelineService_ReadHomeTimeline_pargs::write(::apache::thrift::pro
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 5);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter198;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter198;
     for (_iter198 = (*(this->carrier)).begin(); _iter198 != (*(this->carrier)).end(); ++_iter198)
     {
       xfer += oprot->writeString(_iter198->first);
@@ -493,7 +493,7 @@ uint32_t HomeTimelineService_WriteHomeTimeline_args::write(::apache::thrift::pro
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 6);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->carrier.size()));
-    std::map<std::string, std::string> ::const_iterator _iter223;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter223;
     for (_iter223 = this->carrier.begin(); _iter223 != this->carrier.end(); ++_iter223)
     {
       xfer += oprot->writeString(_iter223->first);
@@ -549,7 +549,7 @@ uint32_t HomeTimelineService_WriteHomeTimeline_pargs::write(::apache::thrift::pr
   xfer += oprot->writeFieldBegin("carrier", ::apache::thrift::protocol::T_MAP, 6);
   {
     xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->carrier)).size()));
-    std::map<std::string, std::string> ::const_iterator _iter225;
+    std::map<std::string, std::string, std::less<>> ::const_iterator _iter225;
     for (_iter225 = (*(this->carrier)).begin(); _iter225 != (*(this->carrier)).end(); ++_iter225)
     {
       xfer += oprot->writeString(_iter225->first);
@@ -672,13 +672,13 @@ uint32_t HomeTimelineService_WriteHomeTimeline_presult::read(::apache::thrift::p
   return xfer;
 }
 
-void HomeTimelineServiceClient::ReadHomeTimeline(std::vector<Post> & _return, const int64_t req_id, const int64_t user_id, const int32_t start, const int32_t stop, const std::map<std::string, std::string> & carrier)
+void HomeTimelineServiceClient::ReadHomeTimeline(std::vector<Post> & _return, const int64_t req_id, const int64_t user_id, const int32_t start, const int32_t stop, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_ReadHomeTimeline(req_id, user_id, start, stop, carrier);
   recv_ReadHomeTimeline(_return);
 }
 
-void HomeTimelineServiceClient::send_ReadHomeTimeline(const int64_t req_id, const int64_t user_id, const int32_t start, const int32_t stop, const std::map<std::string, std::string> & carrier)
+void HomeTimelineServiceClient::send_ReadHomeTimeline(const int64_t req_id, const int64_t user_id, const int32_t start, const int32_t stop, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("ReadHomeTimeline", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -737,13 +737,13 @@ void HomeTimelineServiceClient::recv_ReadHomeTimeline(std::vector<Post> & _retur
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ReadHomeTimeline failed: unknown result");
 }
 
-void HomeTimelineServiceClient::WriteHomeTimeline(const int64_t req_id, const int64_t post_id, const int64_t user_id, const int64_t timestamp, const std::vector<int64_t> & user_mentions_id, const std::map<std::string, std::string> & carrier)
+void HomeTimelineServiceClient::WriteHomeTimeline(const int64_t req_id, const int64_t post_id, const int64_t user_id, const int64_t timestamp, const std::vector<int64_t> & user_mentions_id, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   send_WriteHomeTimeline(req_id, post_id, user_id, timestamp, user_mentions_id, carrier);
   recv_WriteHomeTimeline();
 }
 
-void HomeTimelineServiceClient::send_WriteHomeTimeline(const int64_t req_id, const int64_t post_id, const int64_t user_id, const int64_t timestamp, const std::vector<int64_t> & user_mentions_id, const std::map<std::string, std::string> & carrier)
+void HomeTimelineServiceClient::send_WriteHomeTimeline(const int64_t req_id, const int64_t post_id, const int64_t user_id, const int64_t timestamp, const std::vector<int64_t> & user_mentions_id, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("WriteHomeTimeline", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -937,13 +937,13 @@ void HomeTimelineServiceProcessor::process_WriteHomeTimeline(int32_t seqid, ::ap
   return processor;
 }
 
-void HomeTimelineServiceConcurrentClient::ReadHomeTimeline(std::vector<Post> & _return, const int64_t req_id, const int64_t user_id, const int32_t start, const int32_t stop, const std::map<std::string, std::string> & carrier)
+void HomeTimelineServiceConcurrentClient::ReadHomeTimeline(std::vector<Post> & _return, const int64_t req_id, const int64_t user_id, const int32_t start, const int32_t stop, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_ReadHomeTimeline(req_id, user_id, start, stop, carrier);
   recv_ReadHomeTimeline(_return, seqid);
 }
 
-int32_t HomeTimelineServiceConcurrentClient::send_ReadHomeTimeline(const int64_t req_id, const int64_t user_id, const int32_t start, const int32_t stop, const std::map<std::string, std::string> & carrier)
+int32_t HomeTimelineServiceConcurrentClient::send_ReadHomeTimeline(const int64_t req_id, const int64_t user_id, const int32_t start, const int32_t stop, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);
@@ -1029,13 +1029,13 @@ void HomeTimelineServiceConcurrentClient::recv_ReadHomeTimeline(std::vector<Post
   } // end while(true)
 }
 
-void HomeTimelineServiceConcurrentClient::WriteHomeTimeline(const int64_t req_id, const int64_t post_id, const int64_t user_id, const int64_t timestamp, const std::vector<int64_t> & user_mentions_id, const std::map<std::string, std::string> & carrier)
+void HomeTimelineServiceConcurrentClient::WriteHomeTimeline(const int64_t req_id, const int64_t post_id, const int64_t user_id, const int64_t timestamp, const std::vector<int64_t> & user_mentions_id, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t seqid = send_WriteHomeTimeline(req_id, post_id, user_id, timestamp, user_mentions_id, carrier);
   recv_WriteHomeTimeline(seqid);
 }
 
-int32_t HomeTimelineServiceConcurrentClient::send_WriteHomeTimeline(const int64_t req_id, const int64_t post_id, const int64_t user_id, const int64_t timestamp, const std::vector<int64_t> & user_mentions_id, const std::map<std::string, std::string> & carrier)
+int32_t HomeTimelineServiceConcurrentClient::send_WriteHomeTimeline(const int64_t req_id, const int64_t post_id, const int64_t user_id, const int64_t timestamp, const std::vector<int64_t> & user_mentions_id, const std::map<std::string, std::string, std::less<>> & carrier)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);

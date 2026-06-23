@@ -20,7 +20,7 @@ using namespace social_network;
 static memcached_pool_st* memcached_client_pool;
 static mongoc_client_pool_t* mongodb_client_pool;
 
-void sigintHandler(int) {
+[[noreturn]] void sigintHandler(int) {
   if (memcached_client_pool != nullptr) {
     memcached_pool_destroy(memcached_client_pool);
   }

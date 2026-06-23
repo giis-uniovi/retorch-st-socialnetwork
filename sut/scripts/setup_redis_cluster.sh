@@ -4,6 +4,7 @@ while getopts n: flag
 do
     case "${flag}" in
         n) name=${OPTARG};;
+        *) echo "Usage: $0 -n <cluster-service-name>" >&2; exit 1;;
     esac
 done
 

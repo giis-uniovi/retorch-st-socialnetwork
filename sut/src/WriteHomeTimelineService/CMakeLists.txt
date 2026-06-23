@@ -7,7 +7,6 @@ add_executable(
 
 target_include_directories(
     WriteHomeTimelineService PRIVATE
-    /usr/local/include/jaegertracing
     /usr/local/include/cpp_redis
     ${LIBEVENT_INCLUDE_DIRS}
 )
@@ -22,7 +21,6 @@ target_link_libraries(
     Boost::log
     Boost::log_setup
     OpenSSL::SSL
-    /usr/local/lib/libjaegertracing.so
     /usr/local/lib/libamqpcpp.so
     ${LIBEVENT_LIBRARIES}
     /usr/local/lib/libcpp_redis.a

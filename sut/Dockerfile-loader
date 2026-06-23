@@ -41,3 +41,8 @@ ENV LUA_PATH="/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?;?.lua;?"
 ENV LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;?.so"
 
 WORKDIR /social-network-microservices
+
+# Run the loader as a non-root user
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /social-network-microservices
+USER appuser
