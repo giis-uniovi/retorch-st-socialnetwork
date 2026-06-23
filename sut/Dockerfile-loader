@@ -2,7 +2,7 @@ FROM ubuntu:26.04 AS builder
 
 # Install build dependencies
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         build-essential \
         ca-certificates \
         libsasl2-2 \
@@ -11,11 +11,11 @@ RUN apt-get update && \
         zlib1g-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy wrk2 sources and build 
+# Copy wrk2 sources and build
 COPY ./wrk2 /social-network-microservices/wrk2
 
-RUN cd /social-network-microservices/wrk2 \
-    && make -j$(nproc) \
+WORKDIR /social-network-microservices/wrk2
+RUN make -j$(nproc) \
     && make install
 
 FROM ubuntu:26.04
@@ -28,7 +28,7 @@ COPY ./wrk2/scripts /social-network-microservices/wrk2/scripts
 
 # Install system dependencies
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates \
         libsasl2-2 \
         lua-socket \

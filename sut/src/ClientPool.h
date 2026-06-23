@@ -52,15 +52,15 @@ template<class TClient>
 ClientPool<TClient>::ClientPool(const std::string &client_type,
     const std::string &addr, int port, int min_pool_size,
     int max_pool_size, int timeout_ms, int keepalive_ms,
-    const json &config_json) {
-  _addr = addr;
-  _port = port;
-  _min_pool_size = min_pool_size;
-  _max_pool_size = max_pool_size;
-  _timeout_ms = timeout_ms;
-  _client_type = client_type;
-  _keepalive_ms = keepalive_ms;
-  _config_json = &config_json;
+    const json &config_json)
+    : _addr(addr),
+      _client_type(client_type),
+      _port(port),
+      _min_pool_size(min_pool_size),
+      _max_pool_size(max_pool_size),
+      _timeout_ms(timeout_ms),
+      _keepalive_ms(keepalive_ms),
+      _config_json(&config_json) {
 
   for (int i = 0; i < min_pool_size; ++i) {
     TClient *client = new TClient(addr, port, keepalive_ms, config_json);

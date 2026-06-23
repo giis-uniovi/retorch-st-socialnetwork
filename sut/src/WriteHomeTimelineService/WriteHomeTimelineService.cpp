@@ -23,7 +23,7 @@ static ClientPool<RedisClient> *_redis_client_pool;
 static ClientPool<ThriftClient<SocialGraphServiceClient>>
     *_social_graph_client_pool;
 
-void sigintHandler(int sig) { exit(EXIT_SUCCESS); }
+void sigintHandler(int) { exit(EXIT_SUCCESS); }
 
 void OnReceivedWorker(const AMQP::Message &msg) {
   try {
@@ -52,7 +52,7 @@ void OnReceivedWorker(const AMQP::Message &msg) {
     // Find followers of the user
     auto followers_span = opentracing::Tracer::Global()->StartSpan(
         "get_followers_client", {opentracing::ChildOf(&span->context())});
-    std::map<std::string, std::string> writer_text_map;
+    std::map<std::string, std::string, std::less<>> writer_text_map;
     TextMapWriter writer(writer_text_map);
     opentracing::Tracer::Global()->Inject(followers_span->context(), writer);
 

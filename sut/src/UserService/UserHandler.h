@@ -121,7 +121,7 @@ void UserHandler::RegisterUserWithId(
     const std::map<std::string, std::string> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
@@ -236,7 +236,7 @@ void UserHandler::RegisterUser(
     const std::map<std::string, std::string> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
@@ -381,7 +381,7 @@ void UserHandler::ComposeCreatorWithUsername(
     Creator &_return, const int64_t req_id, const std::string &username,
     const std::map<std::string, std::string> &carrier) {
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
@@ -394,14 +394,16 @@ void UserHandler::ComposeCreatorWithUsername(
   memcached_return_t memcached_rc;
   memcached_st *memcached_client =
       memcached_pool_pop(_memcached_client_pool, true, &memcached_rc);
-  char *user_id_mmc;
+  std::unique_ptr<char, decltype(std::free)*> user_id_mmc_guard(nullptr, std::free);
+  char *user_id_mmc = nullptr;
   if (memcached_client) {
     auto id_get_span = opentracing::Tracer::Global()->StartSpan(
         "user_mmc_get_client", {opentracing::ChildOf(&span->context())});
-    user_id_mmc =
+    user_id_mmc_guard.reset(
         memcached_get(memcached_client, (username + ":user_id").c_str(),
                       (username + ":user_id").length(), &user_id_size,
-                      &memcached_flags, &memcached_rc);
+                      &memcached_flags, &memcached_rc));
+    user_id_mmc = user_id_mmc_guard.get();
     id_get_span->Finish();
     if (!user_id_mmc && memcached_rc != MEMCACHED_NOTFOUND) {
       ServiceException se;
@@ -421,7 +423,6 @@ void UserHandler::ComposeCreatorWithUsername(
     cached = true;
     LOG(debug) << "Found user_id of username :" << username << " in Memcached";
     user_id = std::stoul(user_id_mmc);
-    free(user_id_mmc);
   }
 
   // If not cached in memcached
@@ -540,7 +541,7 @@ void UserHandler::ComposeCreatorWithUserId(
     const std::string &username,
     const std::map<std::string, std::string> &carrier) {
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
@@ -561,7 +562,7 @@ void UserHandler::Login(std::string &_return, int64_t req_id,
                         const std::string &password,
                         const std::map<std::string, std::string> &carrier) {
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
@@ -574,15 +575,18 @@ void UserHandler::Login(std::string &_return, int64_t req_id,
   memcached_return_t memcached_rc;
   memcached_st *memcached_client =
       memcached_pool_pop(_memcached_client_pool, true, &memcached_rc);
-  char *login_mmc;
+  std::unique_ptr<char, decltype(std::free)*> login_mmc_guard(nullptr, std::free);
+  char *login_mmc = nullptr;
   if (!memcached_client) {
     LOG(warning) << "Failed to pop a client from memcached pool";
   } else {
     auto get_login_span = opentracing::Tracer::Global()->StartSpan(
         "user_mmc_get_client", {opentracing::ChildOf(&span->context())});
-    login_mmc = memcached_get(memcached_client, (username + ":login").c_str(),
+    login_mmc_guard.reset(memcached_get(memcached_client,
+                              (username + ":login").c_str(),
                               (username + ":login").length(), &login_size,
-                              &memcached_flags, &memcached_rc);
+                              &memcached_flags, &memcached_rc));
+    login_mmc = login_mmc_guard.get();
     get_login_span->Finish();
     if (!login_mmc && memcached_rc != MEMCACHED_NOTFOUND) {
       LOG(warning) << "Memcached error: "
@@ -605,7 +609,6 @@ void UserHandler::Login(std::string &_return, int64_t req_id,
     salt_stored = login_json["salt"];
     user_id_stored = login_json["user_id"];
     cached = true;
-    free(login_mmc);
   }
 
   else {
@@ -750,7 +753,7 @@ int64_t UserHandler::GetUserId(
     int64_t req_id, const std::string &username,
     const std::map<std::string, std::string> &carrier) {
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
@@ -763,15 +766,17 @@ int64_t UserHandler::GetUserId(
   memcached_return_t memcached_rc;
   memcached_st *memcached_client =
       memcached_pool_pop(_memcached_client_pool, true, &memcached_rc);
-  char *user_id_mmc;
+  std::unique_ptr<char, decltype(std::free)*> user_id_mmc2_guard(nullptr, std::free);
+  char *user_id_mmc = nullptr;
   if (memcached_client) {
     auto id_get_span = opentracing::Tracer::Global()->StartSpan(
         "user_mmc_get_user_id_client",
         {opentracing::ChildOf(&span->context())});
-    user_id_mmc =
+    user_id_mmc2_guard.reset(
         memcached_get(memcached_client, (username + ":user_id").c_str(),
                       (username + ":user_id").length(), &user_id_size,
-                      &memcached_flags, &memcached_rc);
+                      &memcached_flags, &memcached_rc));
+    user_id_mmc = user_id_mmc2_guard.get();
     id_get_span->Finish();
     if (!user_id_mmc && memcached_rc != MEMCACHED_NOTFOUND) {
       ServiceException se;
@@ -791,7 +796,6 @@ int64_t UserHandler::GetUserId(
     cached = true;
     LOG(debug) << "Found user_id of username :" << username << " in Memcached";
     user_id = std::stoul(user_id_mmc);
-    free(user_id_mmc);
   } else {
     // If not cached in memcached
     LOG(debug) << "user_id not cached in Memcached";

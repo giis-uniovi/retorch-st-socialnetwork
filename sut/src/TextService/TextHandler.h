@@ -33,17 +33,16 @@ class TextHandler : public TextServiceIf {
 TextHandler::TextHandler(
     ClientPool<ThriftClient<UrlShortenServiceClient>> *url_client_pool,
     ClientPool<ThriftClient<UserMentionServiceClient>>
-        *user_mention_client_pool) {
-  _url_client_pool = url_client_pool;
-  _user_mention_client_pool = user_mention_client_pool;
-}
+        *user_mention_client_pool)
+    : _url_client_pool(url_client_pool),
+      _user_mention_client_pool(user_mention_client_pool) {}
 
 void TextHandler::ComposeText(
     TextServiceReturn &_return, int64_t req_id, const std::string &text,
     const std::map<std::string, std::string> &carrier) {
   // Initialize a span
   TextMapReader reader(carrier);
-  std::map<std::string, std::string> writer_text_map;
+  std::map<std::string, std::string, std::less<>> writer_text_map;
   TextMapWriter writer(writer_text_map);
   auto parent_span = opentracing::Tracer::Global()->Extract(reader);
   auto span = opentracing::Tracer::Global()->StartSpan(
