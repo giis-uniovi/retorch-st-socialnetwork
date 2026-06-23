@@ -26,10 +26,6 @@ std::shared_ptr<TServerSocket> get_server_socket(const json &config_json, const 
     ssl_socket_factory->loadCertificate(cert_path.c_str());
     ssl_socket_factory->loadPrivateKey(key_path.c_str());
     ssl_socket_factory->ciphers(ciphers);
-    // if (config_json["ssl"]["verifyClient"]) {
-    //   ssl_socket_factory->loadTrustedCertificates(ca_path.c_str());
-    //   ssl_socket_factory->authenticate(true);
-    // }
     return std::make_shared<TSSLServerSocket>(address, port, ssl_socket_factory);
   }
   return std::make_shared<TServerSocket>(address, port);
