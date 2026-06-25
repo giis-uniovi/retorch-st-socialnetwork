@@ -1,17 +1,10 @@
 #include <signal.h>
-#include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/server/TThreadedServer.h>
-#include <thrift/transport/TBufferTransports.h>
-#include <thrift/transport/TServerSocket.h>
 
 #include "../utils.h"
+#include "../utils_service.h"
 #include "../utils_thrift.h"
 #include "ComposePostHandler.h"
 
-using apache::thrift::protocol::TBinaryProtocolFactory;
-using apache::thrift::server::TThreadedServer;
-using apache::thrift::transport::TFramedTransportFactory;
-using apache::thrift::transport::TServerSocket;
 using namespace social_network;
 
 [[noreturn]] void sigintHandler(int) { exit(EXIT_SUCCESS); }
@@ -98,15 +91,13 @@ int main(int argc, char *argv[]) {
       unique_id_conns, unique_id_timeout, unique_id_keepalive, config_json);
 
   std::shared_ptr<TServerSocket> server_socket = get_server_socket(config_json, "0.0.0.0", port);
-  TThreadedServer server(
+
+  start_thrift_server(
       std::make_shared<ComposePostServiceProcessor>(
           std::make_shared<ComposePostHandler>(
               &post_storage_client_pool, &user_timeline_client_pool,
               &user_client_pool, &unique_id_client_pool, &media_client_pool,
               &text_client_pool, &home_timeline_client_pool)),
       server_socket,
-      std::make_shared<TFramedTransportFactory>(),
-      std::make_shared<TBinaryProtocolFactory>());
-  LOG(info) << "Starting the compose-post-service server ...";
-  server.serve();
+      "Starting the compose-post-service server ...");
 }
