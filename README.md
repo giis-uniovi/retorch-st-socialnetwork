@@ -1,55 +1,69 @@
-[![Build Status](https://github.com/giis-uniovi/retorch-st-socialnetwork/actions/workflows/test.yml/badge.svg)](https://github.com/giis-uniovi/retorch-st-socialnetwork/actions)
+[![Status](https://github.com/giis-uniovi/retorch-st-socialnetwork/actions/workflows/test.yml/badge.svg)](https://github.com/giis-uniovi/retorch-st-socialnetwork/actions)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=my%3Aretorch-st-socialnetwork&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=my%3Aretorch-st-socialnetwork)
-# RETORCH Social Network End-to-End Test Suite
 
-End-to-End test suite for the DeathStarBench Social Network microservices application, used as a demonstrator of the [RETORCH Framework](https://github.com/giis-uniovi/retorch).
+# retorch-st-socialnetwork
 
-The Social Network is a distributed benchmark application based on [DeathStarBench](https://github.com/delimitrou/DeathStarBench), built with Thrift RPC, Nginx/OpenResty, MongoDB, Redis, Memcached and RabbitMQ — all running in Docker containers.
+This repository contains an end-to-end test suite for the DeathStarBench social network benchmark, orchestrated with RETORCH. The suite exercises the social network UI and APIs through Selenium and HTTP-based tests.
 
 ## Prerequisites
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows / macOS) or Docker Engine (Linux)
-- Git
-- Java 8+, Maven 3.x
+- Java 8 or newer
+- Maven 3.8+
+- Docker Engine with Docker Compose v2
+- A locally reachable SUT instance (the default target is http://localhost:8080)
 
-## Deployment
+## Local configuration
 
-The SUT is vendored in the [`sut/`](sut/) directory of this repository. The deploy scripts create the `jenkins_network` Docker network, start all containers using the root `docker-compose.yml` (which mounts config, Lua scripts and generated Thrift bindings from `sut/`), and wait up to 300 seconds for the Nginx gateway to be ready.
-
-### Windows (PowerShell)
-
-```powershell
-# Start the SUT on the default port (8080)
-.\deploy-local.ps1
-
-# Start on a custom port
-.\deploy-local.ps1 -Port 9090
-
-# Tear down all containers and volumes
-.\deploy-local.ps1 -Down
-```
-
-### Linux / macOS
+The file [.retorch/envfiles/local.env](.retorch/envfiles/local.env) stores the local defaults used by the deployment helper scripts and the test harness. Review it before running the local workflow and adjust the URL or compose settings if your environment differs.
 
 ```bash
-# Make the script executable (first time only)
-chmod +x deploy-local.sh
-
-# Start the SUT on the default port (8080)
-./deploy-local.sh
-
-# Start on a custom port
-./deploy-local.sh --port 9090
-
-# Tear down all containers and volumes
-./deploy-local.sh --down
+# Example values
+SUT_URL=http://localhost:8080
+SELENOID_PRESENT=false
+COMPOSE_PROJECT_NAME=local
+COMPOSE_FILE=docker-compose.yml
+COMPOSE_OVERRIDE_FILE=docker-compose.local-override.yml
 ```
 
-Once up, the SUT is accessible at `http://localhost:8080` (default).
+## Local deployment helpers
 
+The repository provides two convenience scripts at the root:
 
-## CI deployment — Jenkins
+- [redeploy-local.sh](redeploy-local.sh) for Unix-like shells
+- [redeploy-local.ps1](redeploy-local.ps1) for PowerShell
 
-The `Jenkinsfile` at the repository root defines the full pipeline used by the on-premises Jenkins instance.
-It relies on the lifecycle scripts in `.retorch/scripts/` and the environment files in `.retorch/envfiles/`.
-The GitHub Actions workflow (`.github/workflows/test.yml`) compiles the project; actual test execution is delegated to Jenkins via RETORCH orchestration.
+Both scripts:
+
+- load the values from [.retorch/envfiles/local.env](.retorch/envfiles/local.env)
+- use the compose files defined by `COMPOSE_FILE` and `COMPOSE_OVERRIDE_FILE`
+- build and start the local stack, then wait until the SUT responds
+
+Run them from the repository root:
+
+```bash
+./redeploy-local.sh
+```
+
+```powershell
+./redeploy-local.ps1
+```
+
+Use the `--no-build` flag (or `-NoBuild` in PowerShell) to skip the image build step and redeploy the existing stack.
+
+## Running the tests locally
+
+Once the SUT is available, run the suite with Maven:
+
+```bash
+mvn test
+```
+
+The tests are also wired for CI execution through [Jenkinsfile](Jenkinsfile) and the scripts in [.retorch](.retorch).
+
+## Tear-down
+
+To stop and remove the local compose deployment:
+
+```bash
+docker compose --env-file .retorch/envfiles/local.env -p local down --volumes
+```
