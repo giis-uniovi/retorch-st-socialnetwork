@@ -4,8 +4,10 @@
 #include <memory>
 #include <string>
 
-#include "utils_memcached.h"
+// utils_service.h must come first: it pulls in logger.h (LOG) and utils.h
+// (the `json` alias) that utils_memcached.h depends on but does not include.
 #include "utils_service.h"
+#include "utils_memcached.h"
 
 namespace social_network {
 
