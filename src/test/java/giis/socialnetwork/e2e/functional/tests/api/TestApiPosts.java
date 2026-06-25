@@ -19,8 +19,6 @@ import java.io.IOException;
  */
 class TestApiPosts extends BaseApiClass {
 
-    private static final String READPATH = "/read";
-
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
