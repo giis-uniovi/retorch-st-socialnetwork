@@ -4,7 +4,7 @@
     "replaceable": [],
     "elasticityModel": {
       "elasticityID": "elasModelWebBrowser",
-      "elasticity": 5,
+      "elasticity": 4,
       "elasticityCost": 30.0
     },
     "resourceType": "LOGICAL",

@@ -1,7 +1,7 @@
 package giis.socialnetwork.e2e.functional.tests.api;
 
-import giis.socialnetwork.e2e.functional.common.BaseApiClass;
 import giis.retorch.annotations.AccessMode;
+import giis.socialnetwork.e2e.functional.common.BaseApiClass;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 import org.junit.jupiter.api.Assertions;
@@ -23,8 +23,8 @@ class TestApiUsers extends BaseApiClass {
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("POST /api/user/register returns HTTP 200 and accepts the new user")
-    void testRegisterUser() throws IOException {
+    @DisplayName("TestAPIRegisterUser")
+    void testAPIRegisterUser() throws IOException {
         long ts = unique();
         String username = "reg" + ts;
 
@@ -34,8 +34,8 @@ class TestApiUsers extends BaseApiClass {
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
-    @DisplayName("POST /api/user/register with a missing field returns HTTP 400")
-    void testRegisterMissingFieldReturns400() throws IOException {
+    @DisplayName("TestAPIRegisterMissingField")
+    void testAPIRegisterMissingField() throws IOException {
         // Omit first_name; register.lua rejects incomplete arguments before reaching the user service.
         List<NameValuePair> incomplete = Arrays.asList(
                 new BasicNameValuePair("last_name", "NoFirst"),
@@ -47,8 +47,8 @@ class TestApiUsers extends BaseApiClass {
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("POST /api/user/login returns HTTP 200 and sets the login_token JWT cookie")
-    void testLoginUser() throws IOException {
+    @DisplayName("TestAPILoginUser")
+    void testAPILoginUser() throws IOException {
         long ts = unique();
         String username = "log" + ts;
         String password = "pwd" + ts;
@@ -61,8 +61,8 @@ class TestApiUsers extends BaseApiClass {
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("POST /api/user/login with a wrong password sets no login_token cookie")
-    void testLoginWrongPasswordSetsNoToken() throws IOException {
+    @DisplayName("TestLoginWrongPassword")
+    void testLoginWrongPassword() throws IOException {
         long ts = unique();
         String username = "wrongpw" + ts;
         registerUser("Carol", "Wrong", username, "pwd" + ts);
