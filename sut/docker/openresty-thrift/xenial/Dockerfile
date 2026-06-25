@@ -181,9 +181,9 @@ ENV LUA_PATH="/usr/local/openresty/site/lualib/?.ljbc;/usr/local/openresty/site/
 ENV LUA_CPATH="/usr/local/openresty/site/lualib/?.so;/usr/local/openresty/lualib/?.so;./?.so;/usr/local/lib/lua/5.1/?.so;/usr/local/openresty/luajit/lib/lua/5.1/?.so;/usr/local/lib/lua/5.1/loadall.so;/usr/local/openresty/luajit/lib/lua/5.1/?.so;/usr/local/openresty/lualib/?/?.so"
 
 
-COPY lua-thrift /usr/local/openresty/lualib/thrift
-COPY lua-bridge-tracer /tmp/lua-bridge-tracer
-COPY lua-json/json.lua /usr/local/openresty/lualib/json/json.lua
+COPY docker/openresty-thrift/lua-thrift /usr/local/openresty/lualib/thrift
+COPY docker/openresty-thrift/lua-bridge-tracer /tmp/lua-bridge-tracer
+COPY docker/openresty-thrift/lua-json/json.lua /usr/local/openresty/lualib/json/json.lua
 
 RUN cd /usr/local/openresty/lualib/thrift/src \
     && make \
@@ -215,10 +215,14 @@ RUN cd /tmp \
     && rm -rf lua-resty-jwt \
     && ldconfig
 
-
-# Copy nginx configuration files
-COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
-COPY nginx.vh.default.conf /etc/nginx/conf.d/default.conf
+# Copy nginx configuration files and Thrift Lua bindings into the image.
+# lua-scripts and pages are still live-mounted at runtime for development flexibility.
+COPY docker/openresty-thrift/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
+COPY docker/openresty-thrift/nginx.vh.default.conf /etc/nginx/conf.d/default.conf
+COPY docker/openresty-thrift/jaeger-config.json /usr/local/openresty/nginx/jaeger-config.json
+COPY gen-lua /gen-lua
+COPY nginx-web-server/pages /usr/local/openresty/nginx/pages
+COPY nginx-web-server/lua-scripts /usr/local/openresty/nginx/lua-scripts
 
 CMD ["/usr/local/openresty/bin/openresty", "-g", "daemon off;"]
 

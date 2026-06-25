@@ -2,8 +2,12 @@
 !/src/
 !/CMakeLists.txt
 !/cmake/
+!/config/
 !/datasets/
+!/docker/openresty-thrift/
 !/gen-cpp/
+!/gen-lua/
+!/nginx-web-server/
 !/scripts/
 !/social_network.thrift
 !/third_party/
