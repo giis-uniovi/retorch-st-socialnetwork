@@ -345,11 +345,11 @@ static void WriteToRedisZSet(
     const std::string &key,
     const ScoreMap &redis_zset) {
   if (redis_ctx.client_pool) {
-    redis_ctx.client_pool->zadd(key, redis_zset.begin(), redis_zset.end());
+    redis_ctx.client_pool->zadd(key, std::begin(redis_zset), std::end(redis_zset));
   } else if (redis_ctx.replication_enabled) {
-    redis_ctx.primary_client_pool->zadd(key, redis_zset.begin(), redis_zset.end());
+    redis_ctx.primary_client_pool->zadd(key, std::begin(redis_zset), std::end(redis_zset));
   } else {
-    redis_ctx.cluster_client_pool->zadd(key, redis_zset.begin(), redis_zset.end());
+    redis_ctx.cluster_client_pool->zadd(key, std::begin(redis_zset), std::end(redis_zset));
   }
 }
 

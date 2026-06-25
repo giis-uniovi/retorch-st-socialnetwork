@@ -40,7 +40,7 @@ std::string GenRandomString(const int len) {
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
       "abcdefghijklmnopqrstuvwxyz";
   std::random_device rd;
-  std::uniform_int_distribution<int> dist(
+  std::uniform_int_distribution dist(
       0, static_cast<int>(alphanum.length() - 1));
   std::string s;
   for (int i = 0; i < len; ++i) {
