@@ -1,8 +1,8 @@
 package giis.socialnetwork.e2e.functional.tests.api;
 
 import com.google.gson.JsonArray;
-import giis.socialnetwork.e2e.functional.common.BaseApiClass;
 import giis.retorch.annotations.AccessMode;
+import giis.socialnetwork.e2e.functional.common.BaseApiClass;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,8 +25,8 @@ class TestApiSocialGraph extends BaseApiClass {
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("POST /api/user/follow returns HTTP 200 when following by username")
-    void testFollowUser() throws IOException {
+    @DisplayName("TestAPIFollowUser")
+    void testAPIFollowUser() throws IOException {
         String[] userA = createUserWithName("follower");
         String[] userB = createUserWithName("followee");
 
@@ -37,8 +37,8 @@ class TestApiSocialGraph extends BaseApiClass {
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("GET /api/user/get_follower returns JSON array containing the follower after a follow action")
-    void testGetFollowers() throws IOException {
+    @DisplayName("TestaAPIGetFollowers")
+    void testAPIGetFollowers() throws IOException {
         String[] userA = createUserWithName("fa");
         String userAId = userA[1];
         String[] userB = createUserWithName("fb");
@@ -57,8 +57,8 @@ class TestApiSocialGraph extends BaseApiClass {
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("GET /api/user/get_followee returns JSON array containing the followee after a follow action")
-    void testGetFollowees() throws IOException {
+    @DisplayName("TestAPIGetFolloweesWithToken")
+    void testAPIGetFolloweesWithToken() throws IOException {
         String[] userA = createUserWithName("ga");
         String[] userB = createUserWithName("gb");
         String userBId = userB[1];
@@ -76,8 +76,8 @@ class TestApiSocialGraph extends BaseApiClass {
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("POST /api/user/unfollow removes the followee from the logged-in user's followee list")
-    void testUnfollowRemovesFollowee() throws IOException {
+    @DisplayName("TestAPIUnfollowRemovesFollowee")
+    void testAPIUnfollowRemovesFollowee() throws IOException {
         String[] userA = createUserWithName("ua");
         String[] userB = createUserWithName("ub");
         String[] userC = createUserWithName("uc");
