@@ -117,9 +117,12 @@ RUN apt-get update && \
         openssl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Bake in default config so services start even if the volume mount has
+# restrictive permissions. docker-compose volume mounts override this at runtime.
+COPY --from=builder /social-network-microservices/config /social-network-microservices/config
+
 WORKDIR /social-network-microservices
 
-# Run the services as a non-root user
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
     && chown -R appuser:appuser /social-network-microservices
 USER appuser

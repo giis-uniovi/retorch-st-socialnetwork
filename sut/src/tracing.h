@@ -55,6 +55,22 @@ void SetUpTracer(
   opentracing::Tracer::InitGlobal(opentracing::MakeNoopTracer());
 }
 
+// Extract the incoming trace context from carrier, start a child server span,
+// and inject the context into writer_text_map for downstream calls.
+// Returns the started span. Use span->Finish() before the handler returns.
+inline std::unique_ptr<opentracing::Span> StartServerSpan(
+    const std::string &operation_name,
+    const std::map<std::string, std::string, std::less<>> &carrier,
+    std::map<std::string, std::string, std::less<>> &writer_text_map) {
+  TextMapReader reader(carrier);
+  TextMapWriter writer(writer_text_map);
+  auto parent_span = opentracing::Tracer::Global()->Extract(reader);
+  auto span = opentracing::Tracer::Global()->StartSpan(
+      operation_name, {opentracing::ChildOf(parent_span->get())});
+  opentracing::Tracer::Global()->Inject(span->context(), writer);
+  return span;
+}
+
 } //namespace social_network
 
 #endif //SOCIAL_NETWORK_MICROSERVICES_TRACING_H

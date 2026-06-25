@@ -5,9 +5,46 @@
 #include <mongoc.h>
 #include <bson/bson.h>
 
+#include "../gen-cpp/social_network_types.h"
+
 static constexpr int SERVER_SELECTION_TIMEOUT_MS = 300;
 
 namespace social_network {
+
+// ---------------------------------------------------------------------------
+// MongoDB pool / collection helpers shared by all handler files
+// ---------------------------------------------------------------------------
+
+// Pop a client from the pool; throw SE_MONGODB_ERROR if null.
+inline mongoc_client_t *PopMongoClient(mongoc_client_pool_t *pool) {
+  mongoc_client_t *client = mongoc_client_pool_pop(pool);
+  if (!client) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = "Failed to pop a client from MongoDB pool";
+    throw se;
+  }
+  return client;
+}
+
+// Get a collection from client; push client back and throw SE_MONGODB_ERROR if null.
+inline mongoc_collection_t *GetMongoCollection(
+    mongoc_client_pool_t *pool,
+    mongoc_client_t *client,
+    const char *db_name,
+    const char *collection_name) {
+  mongoc_collection_t *col =
+      mongoc_client_get_collection(client, db_name, collection_name);
+  if (!col) {
+    mongoc_client_pool_push(pool, client);
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = std::format("Failed to create collection {} from DB {}",
+                             collection_name, db_name);
+    throw se;
+  }
+  return col;
+}
 
 mongoc_client_pool_t* init_mongodb_client_pool(
     const json &config_json,

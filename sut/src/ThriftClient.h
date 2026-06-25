@@ -99,7 +99,11 @@ ThriftClient<TThriftClient>::ThriftClient(
 
 template<class TThriftClient>
 ThriftClient<TThriftClient>::~ThriftClient() {
-  Disconnect();
+  try {
+    Disconnect();
+  } catch (...) {
+    // Destructors must not propagate exceptions (MISRA C++2008 15-5-1)
+  }
 }
 
 template<class TThriftClient>

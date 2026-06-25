@@ -5,11 +5,6 @@ const followUsername = () => {
     });
 };
 
-function showUsername() {
-    const username = localStorage.getItem("username");
-    if (username != null) {
-        document.getElementById("username").textContent = username;
-    }
-}
+// showUsername is defined in utils.js
 
 followUsername();

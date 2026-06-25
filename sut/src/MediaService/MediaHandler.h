@@ -9,9 +9,6 @@
 #include "../logger.h"
 #include "../tracing.h"
 
-// 2018-01-01 00:00:00 UTC
-static constexpr long long CUSTOM_EPOCH = 1514764800000LL;
-
 namespace social_network {
 
 class MediaHandler : public MediaServiceIf {

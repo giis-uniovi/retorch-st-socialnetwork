@@ -35,14 +35,18 @@ class UrlShortenHandler : public UrlShortenServiceIf {
  private:
   memcached_pool_st *_memcached_client_pool;
   mongoc_client_pool_t *_mongodb_client_pool;
-  static std::mt19937 _generator;
+  static std::random_device _rd;
   std::uniform_int_distribution<int> _distribution;
   std::string _GenRandomStr(int length);
   std::mutex *_thread_lock;
+
+  static void InsertUrlsToMongo(
+      mongoc_client_pool_t *mongodb_client_pool,
+      const std::vector<Url> &target_urls,
+      opentracing::Span *parent_span);
 };
 
-std::mt19937 UrlShortenHandler::_generator = std::mt19937(std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::system_clock::now().time_since_epoch()).count() % 0xffffffff);
+std::random_device UrlShortenHandler::_rd;
 
 UrlShortenHandler::UrlShortenHandler(
     memcached_pool_st *memcached_client_pool,
@@ -60,11 +64,69 @@ std::string UrlShortenHandler::_GenRandomStr(int length) {
   std::string return_str;
   _thread_lock->lock();
   for (int i = 0; i < length; ++i) {
-    return_str.append(1, char_map[_distribution(_generator)]);
+    return_str.append(1, char_map[_distribution(_rd)]);
   }
   _thread_lock->unlock();
   return return_str;
 }
+
+void UrlShortenHandler::InsertUrlsToMongo(
+    mongoc_client_pool_t *mongodb_client_pool,
+    const std::vector<Url> &target_urls,
+    opentracing::Span *parent_span) {
+  mongoc_client_t *mongodb_client = mongoc_client_pool_pop(mongodb_client_pool);
+  if (!mongodb_client) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = "Failed to pop a client from MongoDB pool";
+    throw se;
+  }
+  auto collection = mongoc_client_get_collection(
+      mongodb_client, "url-shorten", "url-shorten");
+  if (!collection) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = "Failed to create collection user from DB user";
+    mongoc_client_pool_push(mongodb_client_pool, mongodb_client);
+    throw se;
+  }
+
+  auto mongo_span = opentracing::Tracer::Global()->StartSpan(
+      "url_mongo_insert_client",
+      { opentracing::ChildOf(&parent_span->context()) });
+
+  mongoc_bulk_operation_t *bulk;
+  bson_t *doc;
+  bson_error_t error;
+  bson_t reply;
+  bool ret;
+  bulk = mongoc_collection_create_bulk_operation_with_opts(collection, nullptr);
+  for (auto &url : target_urls) {
+    doc = bson_new();
+    BSON_APPEND_UTF8(doc, "shortened_url", url.shortened_url.c_str());
+    BSON_APPEND_UTF8(doc, "expanded_url", url.expanded_url.c_str());
+    mongoc_bulk_operation_insert(bulk, doc);
+    bson_destroy(doc);
+  }
+  ret = mongoc_bulk_operation_execute(bulk, &reply, &error);
+  if (!ret) {
+    LOG(error) << "MongoDB error: " << error.message;
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = "Failed to insert urls to MongoDB";
+    bson_destroy(&reply);
+    mongoc_bulk_operation_destroy(bulk);
+    mongoc_collection_destroy(collection);
+    mongoc_client_pool_push(mongodb_client_pool, mongodb_client);
+    throw se;
+  }
+  bson_destroy(&reply);
+  mongoc_bulk_operation_destroy(bulk);
+  mongoc_collection_destroy(collection);
+  mongoc_client_pool_push(mongodb_client_pool, mongodb_client);
+  mongo_span->Finish();
+}
+
 void UrlShortenHandler::ComposeUrls(
     std::vector<Url> &_return,
     int64_t req_id,
@@ -82,79 +144,17 @@ void UrlShortenHandler::ComposeUrls(
   opentracing::Tracer::Global()->Inject(span->context(), writer);
 
   std::vector<Url> target_urls;
-  std::future<void> mongo_future;
 
   if (!urls.empty()) {
     for (auto &url : urls) {
       Url new_target_url;
       new_target_url.expanded_url = url;
-      new_target_url.shortened_url = HOSTNAME +
-          _GenRandomStr(10);
+      new_target_url.shortened_url = HOSTNAME + _GenRandomStr(10);
       target_urls.emplace_back(new_target_url);
     }
 
-    mongo_future = std::async(
-        std::launch::async, [&](){
-          mongoc_client_t *mongodb_client = mongoc_client_pool_pop(
-              _mongodb_client_pool);
-          if (!mongodb_client) {
-            ServiceException se;
-            se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-            se.message = "Failed to pop a client from MongoDB pool";
-            throw se;
-          }
-          auto collection = mongoc_client_get_collection(
-              mongodb_client, "url-shorten", "url-shorten");
-          if (!collection) {
-            ServiceException se;
-            se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-            se.message = "Failed to create collection user from DB user";
-            mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
-            throw se;
-          }
-
-          auto mongo_span = opentracing::Tracer::Global()->StartSpan(
-              "url_mongo_insert_client",
-              { opentracing::ChildOf(&span->context()) });
-
-          mongoc_bulk_operation_t *bulk;
-          bson_t *doc;
-          bson_error_t error;
-          bson_t reply;
-          bool ret;
-          bulk = mongoc_collection_create_bulk_operation_with_opts(
-              collection, nullptr);
-          for (auto &url : target_urls) {
-            doc = bson_new();
-            BSON_APPEND_UTF8(doc, "shortened_url", url.shortened_url.c_str());
-            BSON_APPEND_UTF8(doc, "expanded_url", url.expanded_url.c_str());
-            mongoc_bulk_operation_insert (bulk, doc);
-            bson_destroy(doc);
-          }
-          ret = mongoc_bulk_operation_execute (bulk, &reply, &error);
-          if (!ret) {
-            LOG(error) << "MongoDB error: "<< error.message;
-            ServiceException se;
-            se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-            se.message = "Failed to insert urls to MongoDB";
-            bson_destroy (&reply);
-            mongoc_bulk_operation_destroy(bulk);
-            mongoc_collection_destroy(collection);
-            mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
-            throw se;
-          }
-          bson_destroy (&reply);
-          mongoc_bulk_operation_destroy(bulk);
-          mongoc_collection_destroy(collection);
-          mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
-          mongo_span->Finish();
-        });
-
-  }
-
-  if (!urls.empty()) {
     try {
-      mongo_future.get();
+      InsertUrlsToMongo(_mongodb_client_pool, target_urls, span.get());
     } catch (...) {
       LOG(error) << "Failed to upload shortened urls from MongoDB";
       throw;
@@ -163,7 +163,6 @@ void UrlShortenHandler::ComposeUrls(
 
   _return = target_urls;
   span->Finish();
-
 }
 
 void UrlShortenHandler::GetExtendedUrls(
