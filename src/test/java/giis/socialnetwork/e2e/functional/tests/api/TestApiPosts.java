@@ -2,8 +2,8 @@ package giis.socialnetwork.e2e.functional.tests.api;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import giis.socialnetwork.e2e.functional.common.BaseApiClass;
 import giis.retorch.annotations.AccessMode;
+import giis.socialnetwork.e2e.functional.common.BaseApiClass;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,8 +23,8 @@ class TestApiPosts extends BaseApiClass {
     @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("POST /wrk2-api/post/compose returns HTTP 200 for a registered user")
-    void testComposePost() throws IOException {
+    @DisplayName("TestAPIComposePost")
+    void testAPIComposePost() throws IOException {
         String[] author = createUserWithName("compose");
         String username = author[0];
         long userId = Long.parseLong(author[1]);
@@ -41,8 +41,8 @@ class TestApiPosts extends BaseApiClass {
     @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "user-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
     @Test
-    @DisplayName("GET /wrk2-api/user-timeline/read returns a JSON array containing the composed post")
-    void testReadUserTimeline() throws IOException {
+    @DisplayName("TestAPIReadUserTimeline")
+    void testAPIReadUserTimeline() throws IOException {
         String[] user = createUserWithName("timeline");
         String username = user[0];
         long userId = Long.parseLong(user[1]);
@@ -50,16 +50,16 @@ class TestApiPosts extends BaseApiClass {
 
         composePost(username, userId, postText);
 
-        String url = wrk2UserTimelineUrl("/read") + "?user_id=" + userId + "&start=0&stop=10";
+        String url = wrk2UserTimelineUrl(READPATH) + "?user_id=" + userId + "&start=0&stop=10";
         JsonArray timeline = getJsonArray(url);
         Assertions.assertFalse(timeline.isEmpty(), "User timeline must contain at least one post after composing");
 
         JsonObject post = timeline.get(0).getAsJsonObject();
         Assertions.assertAll(
-                () -> Assertions.assertTrue(post.has("post_id"),  "Post must have 'post_id'"),
-                () -> Assertions.assertTrue(post.has("creator"),  "Post must have 'creator'"),
-                () -> Assertions.assertTrue(post.has("text"),     "Post must have 'text'"),
-                () -> Assertions.assertTrue(post.has("timestamp"),"Post must have 'timestamp'")
+                () -> Assertions.assertTrue(post.has("post_id"), "Post must have 'post_id'"),
+                () -> Assertions.assertTrue(post.has("creator"), "Post must have 'creator'"),
+                () -> Assertions.assertTrue(post.has("text"), "Post must have 'text'"),
+                () -> Assertions.assertTrue(post.has("timestamp"), "Post must have 'timestamp'")
         );
 
         JsonObject creator = post.get("creator").getAsJsonObject();
@@ -71,8 +71,8 @@ class TestApiPosts extends BaseApiClass {
     @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "user-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
     @Test
-    @DisplayName("A post mentioning an existing user records that user in the post's user_mentions")
-    void testComposePostWithMentionPopulatesUserMentions() throws IOException {
+    @DisplayName("TestAPIComposePostWithMentionPopulatesUserMentions")
+    void testAPIComposePostWithMentionPopulatesUserMentions() throws IOException {
         String[] author = createUserWithName("mentionauthor");
         String authorName = author[0];
         long authorId = Long.parseLong(author[1]);
@@ -81,7 +81,7 @@ class TestApiPosts extends BaseApiClass {
 
         composePost(authorName, authorId, "hi @" + mentionedName + " " + unique());
 
-        String url = wrk2UserTimelineUrl("/read") + "?user_id=" + authorId + "&start=0&stop=10";
+        String url = wrk2UserTimelineUrl(READPATH) + "?user_id=" + authorId + "&start=0&stop=10";
         JsonArray timeline = getJsonArray(url);
         Assertions.assertFalse(timeline.isEmpty(), "Author timeline must contain the composed post");
 
@@ -92,9 +92,9 @@ class TestApiPosts extends BaseApiClass {
 
     @AccessMode(resID = "user-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
     @Test
-    @DisplayName("GET /wrk2-api/user-timeline/read with missing args returns HTTP 400")
-    void testReadUserTimelineBadRequest() throws IOException {
-        int status = getStatus(wrk2UserTimelineUrl("/read"));
+    @DisplayName("TestAPIReadUserTimelineBadRequest")
+    void testAPIReadUserTimelineBadRequest() throws IOException {
+        int status = getStatus(wrk2UserTimelineUrl(READPATH));
         Assertions.assertEquals(400, status, "Timeline read without required params must return HTTP 400");
     }
 }

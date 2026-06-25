@@ -15,22 +15,19 @@ public class Waiter {
     private static final Logger log = LoggerFactory.getLogger(Waiter.class);
     private static final int NAV_WAIT_SECONDS = 30;
     private static final int WAIT_DEFAULT = 10;
-    private final WebDriverWait waiter;
+    private final WebDriverWait genericWaiter;
     private final WebDriverWait navWaiter;
 
     public Waiter(WebDriver driver) {
-        waiter = new WebDriverWait(driver, Duration.ofSeconds(WAIT_DEFAULT));
+        genericWaiter = new WebDriverWait(driver, Duration.ofSeconds(WAIT_DEFAULT));
         navWaiter = new WebDriverWait(driver, Duration.ofSeconds(NAV_WAIT_SECONDS));
     }
 
-    public void waitUntil(ExpectedCondition<?> condition, String errorMessage) {
-        try {
-            this.waiter.until(condition);
-        } catch (org.openqa.selenium.TimeoutException timeout) {
-            log.error(errorMessage);
-            throw new org.openqa.selenium.TimeoutException(
-                    "\"" + errorMessage + "\" > " + timeout.getMessage());
-        }
+    /*** Login page (index.html) — login form username field.*/
+    public void waitForLoginPage() {
+        log.debug("Waiting for login page to load");
+        navWaitUntil(ExpectedConditions.visibilityOfElementLocated(By.name("username")),
+                "Login page did not load");
     }
 
     public void navWaitUntil(ExpectedCondition<?> condition, String errorMessage) {
@@ -42,28 +39,14 @@ public class Waiter {
         }
     }
 
-    /** Login page (index.html) — login form username field. */
-    public void waitForLoginPage() {
-        log.debug("Waiting for login page to load");
-        navWaitUntil(ExpectedConditions.visibilityOfElementLocated(By.name("username")),
-                "Login page did not load");
-    }
-
-    /** Signup page — first_name field present. */
+    /*** Signup page — first_name field present.*/
     public void waitForSignupPage() {
         log.debug("Waiting for signup page to load");
         navWaitUntil(ExpectedConditions.visibilityOfElementLocated(By.name("first_name")),
                 "Signup page did not load");
     }
 
-    /** Main feed page (main.html) — navbar brand link. */
-    public void waitForMainPage() {
-        log.debug("Waiting for main page to load");
-        navWaitUntil(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("a.navbar-brand")),
-                "Main page did not load");
-    }
-
-    /** Contact page — follow form input (always visible). */
+    /** Contact page — follow form input (always visible).*/
     public void waitForContactPage() {
         log.debug("Waiting for contact page to load");
         navWaitUntil(ExpectedConditions.visibilityOfElementLocated(By.id("followee-name")),
@@ -81,7 +64,7 @@ public class Waiter {
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 waitUntil(ExpectedConditions.textToBePresentInElementLocated(
-                        By.cssSelector("#card-block"), expectedText),
+                                By.cssSelector("#card-block"), expectedText),
                         "Post text '" + expectedText + "' not yet in timeline");
                 return;
             } catch (org.openqa.selenium.TimeoutException e) {
@@ -96,5 +79,24 @@ public class Waiter {
                 }
             }
         }
+    }
+
+    public void waitUntil(ExpectedCondition<?> condition, String errorMessage) {
+        try {
+            this.genericWaiter.until(condition);
+        } catch (org.openqa.selenium.TimeoutException timeout) {
+            log.error(errorMessage);
+            throw new org.openqa.selenium.TimeoutException(
+                    "\"" + errorMessage + "\" > " + timeout.getMessage());
+        }
+    }
+
+    /**
+     * Main feed page (main.html) — navbar brand link.
+     */
+    public void waitForMainPage() {
+        log.debug("Waiting for main page to load");
+        navWaitUntil(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("a.navbar-brand")),
+                "Main page did not load");
     }
 }
