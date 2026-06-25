@@ -373,8 +373,8 @@ void ComposePostHandler::ComposePost(
   // auto-joins on scope exit, even if a get() below throws). Each task gets its
   // own by-value copies of the arguments, so there is no shared mutable state.
   std::vector<std::jthread> async_threads;
-  auto launch = [&async_threads](auto callable) {
-    using R = std::invoke_result_t<decltype(callable)>;
+  auto launch = [&async_threads]<typename Callable>(Callable callable) {
+    using R = std::invoke_result_t<Callable>;
     std::packaged_task<R()> task(std::move(callable));
     auto fut = task.get_future();
     async_threads.emplace_back(std::move(task));

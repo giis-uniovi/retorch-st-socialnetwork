@@ -28,6 +28,18 @@ class TextHandler : public TextServiceIf {
  private:
   ClientPool<ThriftClient<UrlShortenServiceClient>> *_url_client_pool;
   ClientPool<ThriftClient<UserMentionServiceClient>> *_user_mention_client_pool;
+
+  static std::vector<Url> ComposeUrlsSync(
+      ClientPool<ThriftClient<UrlShortenServiceClient>> *url_client_pool,
+      int64_t req_id,
+      const std::vector<std::string> &urls,
+      opentracing::Span *parent_span);
+
+  static std::vector<UserMention> ComposeUserMentionsSync(
+      ClientPool<ThriftClient<UserMentionServiceClient>> *user_mention_client_pool,
+      int64_t req_id,
+      const std::vector<std::string> &mention_usernames,
+      opentracing::Span *parent_span);
 };
 
 TextHandler::TextHandler(
@@ -36,6 +48,75 @@ TextHandler::TextHandler(
         *user_mention_client_pool)
     : _url_client_pool(url_client_pool),
       _user_mention_client_pool(user_mention_client_pool) {}
+
+std::vector<Url> TextHandler::ComposeUrlsSync(
+    ClientPool<ThriftClient<UrlShortenServiceClient>> *url_client_pool,
+    int64_t req_id,
+    const std::vector<std::string> &urls,
+    opentracing::Span *parent_span) {
+  auto url_span = opentracing::Tracer::Global()->StartSpan(
+      "compose_urls_client", {opentracing::ChildOf(&parent_span->context())});
+
+  std::map<std::string, std::string, std::less<>> url_writer_text_map;
+  TextMapWriter url_writer(url_writer_text_map);
+  opentracing::Tracer::Global()->Inject(url_span->context(), url_writer);
+
+  auto url_client_wrapper = url_client_pool->Pop();
+  if (!url_client_wrapper) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_THRIFT_CONN_ERROR;
+    se.message = "Failed to connect to url-shorten-service";
+    throw se;
+  }
+  std::vector<Url> _return_urls;
+  auto url_client = url_client_wrapper->GetClient();
+  try {
+    url_client->ComposeUrls(_return_urls, req_id, urls, url_writer_text_map);
+  } catch (...) {
+    LOG(error) << "Failed to upload urls to url-shorten-service";
+    url_client_pool->Remove(url_client_wrapper);
+    throw;
+  }
+  url_client_pool->Keepalive(url_client_wrapper);
+  return _return_urls;
+}
+
+std::vector<UserMention> TextHandler::ComposeUserMentionsSync(
+    ClientPool<ThriftClient<UserMentionServiceClient>> *user_mention_client_pool,
+    int64_t req_id,
+    const std::vector<std::string> &mention_usernames,
+    opentracing::Span *parent_span) {
+  auto user_mention_span = opentracing::Tracer::Global()->StartSpan(
+      "compose_user_mentions_client",
+      {opentracing::ChildOf(&parent_span->context())});
+
+  std::map<std::string, std::string, std::less<>> user_mention_writer_text_map;
+  TextMapWriter user_mention_writer(user_mention_writer_text_map);
+  opentracing::Tracer::Global()->Inject(user_mention_span->context(),
+                                        user_mention_writer);
+
+  auto user_mention_client_wrapper = user_mention_client_pool->Pop();
+  if (!user_mention_client_wrapper) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_THRIFT_CONN_ERROR;
+    se.message = "Failed to connect to user-mention-service";
+    throw se;
+  }
+  std::vector<UserMention> _return_user_mentions;
+  auto user_mention_client = user_mention_client_wrapper->GetClient();
+  try {
+    user_mention_client->ComposeUserMentions(_return_user_mentions, req_id,
+                                             mention_usernames,
+                                             user_mention_writer_text_map);
+  } catch (...) {
+    LOG(error) << "Failed to upload user_mentions to user-mention-service";
+    user_mention_client_pool->Remove(user_mention_client_wrapper);
+    throw;
+  }
+
+  user_mention_client_pool->Keepalive(user_mention_client_wrapper);
+  return _return_user_mentions;
+}
 
 void TextHandler::ComposeText(
     TextServiceReturn &_return, int64_t req_id, const std::string &text,
@@ -69,70 +150,9 @@ void TextHandler::ComposeText(
     s = m.suffix().str();
   }
 
-  auto shortened_urls_future = std::async(std::launch::async, [&]() {
-    auto url_span = opentracing::Tracer::Global()->StartSpan(
-        "compose_urls_client", {opentracing::ChildOf(&span->context())});
-
-    std::map<std::string, std::string, std::less<>> url_writer_text_map;
-    TextMapWriter url_writer(url_writer_text_map);
-    opentracing::Tracer::Global()->Inject(url_span->context(), url_writer);
-
-    auto url_client_wrapper = _url_client_pool->Pop();
-    if (!url_client_wrapper) {
-      ServiceException se;
-      se.errorCode = ErrorCode::SE_THRIFT_CONN_ERROR;
-      se.message = "Failed to connect to url-shorten-service";
-      throw se;
-    }
-    std::vector<Url> _return_urls;
-    auto url_client = url_client_wrapper->GetClient();
-    try {
-      url_client->ComposeUrls(_return_urls, req_id, urls, url_writer_text_map);
-    } catch (...) {
-      LOG(error) << "Failed to upload urls to url-shorten-service";
-      _url_client_pool->Remove(url_client_wrapper);
-      throw;
-    }
-    _url_client_pool->Keepalive(url_client_wrapper);
-    return _return_urls;
-  });
-
-  auto user_mention_future = std::async(std::launch::async, [&]() {
-    auto user_mention_span = opentracing::Tracer::Global()->StartSpan(
-        "compose_user_mentions_client",
-        {opentracing::ChildOf(&span->context())});
-
-    std::map<std::string, std::string, std::less<>> user_mention_writer_text_map;
-    TextMapWriter user_mention_writer(user_mention_writer_text_map);
-    opentracing::Tracer::Global()->Inject(user_mention_span->context(),
-                                          user_mention_writer);
-
-    auto user_mention_client_wrapper = _user_mention_client_pool->Pop();
-    if (!user_mention_client_wrapper) {
-      ServiceException se;
-      se.errorCode = ErrorCode::SE_THRIFT_CONN_ERROR;
-      se.message = "Failed to connect to user-mention-service";
-      throw se;
-    }
-    std::vector<UserMention> _return_user_mentions;
-    auto user_mention_client = user_mention_client_wrapper->GetClient();
-    try {
-      user_mention_client->ComposeUserMentions(_return_user_mentions, req_id,
-                                               mention_usernames,
-                                               user_mention_writer_text_map);
-    } catch (...) {
-      LOG(error) << "Failed to upload user_mentions to user-mention-service";
-      _user_mention_client_pool->Remove(user_mention_client_wrapper);
-      throw;
-    }
-
-    _user_mention_client_pool->Keepalive(user_mention_client_wrapper);
-    return _return_user_mentions;
-  });
-
   std::vector<Url> target_urls;
   try {
-    target_urls = shortened_urls_future.get();
+    target_urls = ComposeUrlsSync(_url_client_pool, req_id, urls, span.get());
   } catch (...) {
     LOG(error) << "Failed to get shortened urls from url-shorten-service";
     throw;
@@ -140,7 +160,8 @@ void TextHandler::ComposeText(
 
   std::vector<UserMention> user_mentions;
   try {
-    user_mentions = user_mention_future.get();
+    user_mentions = ComposeUserMentionsSync(_user_mention_client_pool, req_id,
+                                            mention_usernames, span.get());
   } catch (...) {
     LOG(error) << "Failed to upload user mentions to user-mention-service";
     throw;

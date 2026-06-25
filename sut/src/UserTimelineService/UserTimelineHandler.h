@@ -7,7 +7,6 @@
 #include <sw/redis++/redis++.h>
 
 #include <algorithm>
-#include <future>
 #include <iostream>
 #include <string>
 
@@ -17,7 +16,9 @@
 #include "../ThriftClient.h"
 #include "../logger.h"
 #include "../tracing.h"
+#include "../utils_redis.h"
 #include "../transparent_hash.h"
+#include "../utils_mongodb.h"
 
 using namespace sw::redis;
 
@@ -45,80 +46,66 @@ class UserTimelineHandler : public UserTimelineServiceIf {
                         const std::map<std::string, std::string, std::less<>> &) override;
 
  private:
-  Redis *_redis_client_pool;
-  Redis *_redis_replica_pool;
-  Redis *_redis_primary_pool;
-  RedisCluster *_redis_cluster_client_pool;
+  RedisPoolSet _redis;
   mongoc_client_pool_t *_mongodb_client_pool;
   ClientPool<ThriftClient<PostStorageServiceClient>> *_post_client_pool;
+
+  // Reads post IDs from MongoDB for user_id in range [mongo_start, stop).
+  // Appends new (non-duplicate) post IDs to post_ids and populates redis_update_map.
+  void ReadPostIdsFromMongo(
+      int64_t user_id, int mongo_start, int stop,
+      opentracing::Span *parent_span,
+      std::vector<int64_t> &post_ids,
+      std::unordered_map<std::string, double, TransparentStringHash, std::equal_to<>> &redis_update_map);
+
+  // Appends curr_post_id to post_ids only if it is not already present.
+  static void AppendIfNotDuplicate(std::vector<int64_t> &post_ids,
+                                   int64_t curr_post_id);
+
+  // Fetches posts from the post-storage-service for the given post IDs.
+  static std::vector<Post> FetchPostsFromStorage(
+      int64_t req_id,
+      const std::vector<int64_t> &post_ids,
+      const std::map<std::string, std::string, std::less<>> &writer_text_map,
+      ClientPool<ThriftClient<PostStorageServiceClient>> *post_client_pool);
 };
 
 UserTimelineHandler::UserTimelineHandler(
     Redis *redis_pool, mongoc_client_pool_t *mongodb_pool,
-    ClientPool<ThriftClient<PostStorageServiceClient>> *post_client_pool) {
-  _redis_client_pool = redis_pool;
-  _redis_replica_pool = nullptr;
-  _redis_primary_pool = nullptr;
-  _redis_cluster_client_pool = nullptr;
-  _mongodb_client_pool = mongodb_pool;
-  _post_client_pool = post_client_pool;
-}
+    ClientPool<ThriftClient<PostStorageServiceClient>> *post_client_pool)
+    : _redis(RedisPoolSet::Standalone(redis_pool)),
+      _mongodb_client_pool(mongodb_pool),
+      _post_client_pool(post_client_pool) {}
 
 UserTimelineHandler::UserTimelineHandler(
-    Redis* redis_replica_pool, Redis* redis_primary_pool, mongoc_client_pool_t* mongodb_pool,
-    ClientPool<ThriftClient<PostStorageServiceClient>>* post_client_pool) {
-    _redis_client_pool = nullptr;
-    _redis_replica_pool = redis_replica_pool;
-    _redis_primary_pool = redis_primary_pool;
-    _redis_cluster_client_pool = nullptr;
-    _mongodb_client_pool = mongodb_pool;
-    _post_client_pool = post_client_pool;
-}
+    Redis *redis_replica_pool, Redis *redis_primary_pool,
+    mongoc_client_pool_t *mongodb_pool,
+    ClientPool<ThriftClient<PostStorageServiceClient>> *post_client_pool)
+    : _redis(RedisPoolSet::Replication(redis_replica_pool, redis_primary_pool)),
+      _mongodb_client_pool(mongodb_pool),
+      _post_client_pool(post_client_pool) {}
 
 UserTimelineHandler::UserTimelineHandler(
     RedisCluster *redis_pool, mongoc_client_pool_t *mongodb_pool,
-    ClientPool<ThriftClient<PostStorageServiceClient>> *post_client_pool) {
-  _redis_cluster_client_pool = redis_pool;
-  _redis_replica_pool = nullptr;
-  _redis_primary_pool = nullptr;
-  _redis_client_pool = nullptr;
-  _mongodb_client_pool = mongodb_pool;
-  _post_client_pool = post_client_pool;
-}
+    ClientPool<ThriftClient<PostStorageServiceClient>> *post_client_pool)
+    : _redis(RedisPoolSet::Cluster(redis_pool)),
+      _mongodb_client_pool(mongodb_pool),
+      _post_client_pool(post_client_pool) {}
 
 bool UserTimelineHandler::IsRedisReplicationEnabled() {
-    return (_redis_primary_pool || _redis_replica_pool);
+  return _redis.IsReplicationEnabled();
 }
 
 void UserTimelineHandler::WriteUserTimeline(
     int64_t req_id, int64_t post_id, int64_t user_id, int64_t timestamp,
     const std::map<std::string, std::string, std::less<>> &carrier) {
-  // Initialize a span
-  TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
-  TextMapWriter writer(writer_text_map);
-  auto parent_span = opentracing::Tracer::Global()->Extract(reader);
-  auto span = opentracing::Tracer::Global()->StartSpan(
-      "write_user_timeline_server", {opentracing::ChildOf(parent_span->get())});
-  opentracing::Tracer::Global()->Inject(span->context(), writer);
+  auto span = StartServerSpan("write_user_timeline_server", carrier,
+                              writer_text_map);
 
-  mongoc_client_t *mongodb_client =
-      mongoc_client_pool_pop(_mongodb_client_pool);
-  if (!mongodb_client) {
-    ServiceException se;
-    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-    se.message = "Failed to pop a client from MongoDB pool";
-    throw se;
-  }
-  auto collection = mongoc_client_get_collection(
-      mongodb_client, "user-timeline", "user-timeline");
-  if (!collection) {
-    ServiceException se;
-    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-    se.message = "Failed to create collection user-timeline from MongoDB";
-    mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
-    throw se;
-  }
+  mongoc_client_t *mongodb_client = PopMongoClient(_mongodb_client_pool);
+  auto collection = GetMongoCollection(_mongodb_client_pool, mongodb_client,
+                                       "user-timeline", "user-timeline");
   bson_t *query = bson_new();
 
   BSON_APPEND_INT64(query, "user_id", user_id);
@@ -167,15 +154,15 @@ void UserTimelineHandler::WriteUserTimeline(
       "write_user_timeline_redis_update_client",
       {opentracing::ChildOf(&span->context())});
   try {
-    if (_redis_client_pool)
-      _redis_client_pool->zadd(std::to_string(user_id), std::to_string(post_id),
+    if (_redis.client)
+      _redis.client->zadd(std::to_string(user_id), std::to_string(post_id),
                               timestamp, UpdateType::NOT_EXIST);
     else if (IsRedisReplicationEnabled()) {
-        _redis_primary_pool->zadd(std::to_string(user_id), std::to_string(post_id),
+        _redis.primary->zadd(std::to_string(user_id), std::to_string(post_id),
                               timestamp, UpdateType::NOT_EXIST);
     }
     else
-      _redis_cluster_client_pool->zadd(std::to_string(user_id), std::to_string(post_id),
+      _redis.cluster->zadd(std::to_string(user_id), std::to_string(post_id),
                               timestamp, UpdateType::NOT_EXIST);
 
   } catch (const Error &err) {
@@ -186,17 +173,104 @@ void UserTimelineHandler::WriteUserTimeline(
   span->Finish();
 }
 
+void UserTimelineHandler::AppendIfNotDuplicate(std::vector<int64_t> &post_ids,
+                                               int64_t curr_post_id) {
+  if (std::ranges::find(post_ids, curr_post_id) == post_ids.end()) {
+    post_ids.emplace_back(curr_post_id);
+  }
+}
+
+void UserTimelineHandler::ReadPostIdsFromMongo(
+    int64_t user_id, int mongo_start, int stop,
+    opentracing::Span *parent_span,
+    std::vector<int64_t> &post_ids,
+    std::unordered_map<std::string, double, TransparentStringHash, std::equal_to<>> &redis_update_map) {
+
+  mongoc_client_t *mongodb_client = PopMongoClient(_mongodb_client_pool);
+  auto collection = GetMongoCollection(_mongodb_client_pool, mongodb_client,
+                                       "user-timeline", "user-timeline");
+
+  bson_t *query = BCON_NEW("user_id", BCON_INT64(user_id));
+  bson_t *opts = BCON_NEW("projection", "{", "posts", "{", "$slice", "[",
+                          BCON_INT32(0), BCON_INT32(stop), "]", "}", "}");
+
+  auto find_span = opentracing::Tracer::Global()->StartSpan(
+      "user_timeline_mongo_find_client",
+      {opentracing::ChildOf(&parent_span->context())});
+  mongoc_cursor_t *cursor =
+      mongoc_collection_find_with_opts(collection, query, opts, nullptr);
+  find_span->Finish();
+  const bson_t *doc;
+  bool found = mongoc_cursor_next(cursor, &doc);
+  if (found) {
+    bson_iter_t iter_0;
+    bson_iter_t iter_1;
+    bson_iter_t post_id_child;
+    bson_iter_t timestamp_child;
+    int idx = 0;
+    bson_iter_init(&iter_0, doc);
+    bson_iter_init(&iter_1, doc);
+    while (bson_iter_find_descendant(
+               &iter_0, std::format("posts.{}.post_id", idx).c_str(),
+               &post_id_child) &&
+           BSON_ITER_HOLDS_INT64(&post_id_child) &&
+           bson_iter_find_descendant(
+               &iter_1,
+               std::format("posts.{}.timestamp", idx).c_str(),
+               &timestamp_child) &&
+           BSON_ITER_HOLDS_INT64(&timestamp_child)) {
+      auto curr_post_id = bson_iter_int64(&post_id_child);
+      auto curr_timestamp = bson_iter_int64(&timestamp_child);
+      if (idx >= mongo_start) {
+        //In mixed workload condition, post may composed between redis and mongo read
+        //mongodb index will shift and duplicate post_id occurs
+        AppendIfNotDuplicate(post_ids, curr_post_id);
+      }
+      redis_update_map.insert(std::make_pair(std::to_string(curr_post_id),
+                                             (double)curr_timestamp));
+      bson_iter_init(&iter_0, doc);
+      bson_iter_init(&iter_1, doc);
+      idx++;
+    }
+  }
+  bson_destroy(opts);
+  bson_destroy(query);
+  mongoc_cursor_destroy(cursor);
+  mongoc_collection_destroy(collection);
+  mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
+}
+
+std::vector<Post> UserTimelineHandler::FetchPostsFromStorage(
+    int64_t req_id,
+    const std::vector<int64_t> &post_ids,
+    const std::map<std::string, std::string, std::less<>> &writer_text_map,
+    ClientPool<ThriftClient<PostStorageServiceClient>> *post_client_pool) {
+  auto post_client_wrapper = post_client_pool->Pop();
+  if (!post_client_wrapper) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_THRIFT_CONN_ERROR;
+    se.message = "Failed to connect to post-storage-service";
+    throw se;
+  }
+  std::vector<Post> return_posts;
+  auto post_client = post_client_wrapper->GetClient();
+  try {
+    post_client->ReadPosts(return_posts, req_id, post_ids, writer_text_map);
+  } catch (...) {
+    post_client_pool->Remove(post_client_wrapper);
+    LOG(error) << "Failed to read posts from post-storage-service";
+    throw;
+  }
+  post_client_pool->Keepalive(post_client_wrapper);
+  return return_posts;
+}
+
 void UserTimelineHandler::ReadUserTimeline(
     std::vector<Post> &_return, int64_t req_id, int64_t user_id, int start,
     int stop, const std::map<std::string, std::string, std::less<>> &carrier) {
-  // Initialize a span
-  TextMapReader reader(carrier);
   std::map<std::string, std::string, std::less<>> writer_text_map;
-  TextMapWriter writer(writer_text_map);
-  auto parent_span = opentracing::Tracer::Global()->Extract(reader);
-  auto span = opentracing::Tracer::Global()->StartSpan(
-      "read_user_timeline_server", {opentracing::ChildOf(parent_span->get())});
-  opentracing::Tracer::Global()->Inject(span->context(), writer);
+  auto span = StartServerSpan("read_user_timeline_server", carrier,
+                              writer_text_map);
 
   if (stop <= start || start < 0) {
     return;
@@ -208,15 +282,15 @@ void UserTimelineHandler::ReadUserTimeline(
 
   std::vector<std::string> post_ids_str;
   try {
-    if (_redis_client_pool)
-      _redis_client_pool->zrevrange(std::to_string(user_id), start, stop - 1,
+    if (_redis.client)
+      _redis.client->zrevrange(std::to_string(user_id), start, stop - 1,
                                   std::back_inserter(post_ids_str));
     else if (IsRedisReplicationEnabled()) {
-        _redis_replica_pool->zrevrange(std::to_string(user_id), start, stop - 1,
+        _redis.replica->zrevrange(std::to_string(user_id), start, stop - 1,
             std::back_inserter(post_ids_str));
     }
     else
-      _redis_cluster_client_pool->zrevrange(std::to_string(user_id), start, stop - 1,
+      _redis.cluster->zrevrange(std::to_string(user_id), start, stop - 1,
                                   std::back_inserter(post_ids_str));
   } catch (const Error &err) {
     LOG(error) << err.what();
@@ -233,115 +307,26 @@ void UserTimelineHandler::ReadUserTimeline(
   int mongo_start = start + post_ids.size();
   std::unordered_map<std::string, double, TransparentStringHash, std::equal_to<>> redis_update_map;
   if (mongo_start < stop) {
-    // Instead find post_ids from mongodb
-    mongoc_client_t *mongodb_client =
-        mongoc_client_pool_pop(_mongodb_client_pool);
-    if (!mongodb_client) {
-      ServiceException se;
-      se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-      se.message = "Failed to pop a client from MongoDB pool";
-      throw se;
-    }
-    auto collection = mongoc_client_get_collection(
-        mongodb_client, "user-timeline", "user-timeline");
-    if (!collection) {
-      ServiceException se;
-      se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-      se.message = "Failed to create collection user-timeline from MongoDB";
-      throw se;
-    }
-
-    bson_t *query = BCON_NEW("user_id", BCON_INT64(user_id));
-    bson_t *opts = BCON_NEW("projection", "{", "posts", "{", "$slice", "[",
-                            BCON_INT32(0), BCON_INT32(stop), "]", "}", "}");
-
-    auto find_span = opentracing::Tracer::Global()->StartSpan(
-        "user_timeline_mongo_find_client",
-        {opentracing::ChildOf(&span->context())});
-    mongoc_cursor_t *cursor =
-        mongoc_collection_find_with_opts(collection, query, opts, nullptr);
-    find_span->Finish();
-    const bson_t *doc;
-    bool found = mongoc_cursor_next(cursor, &doc);
-    if (found) {
-      bson_iter_t iter_0;
-      bson_iter_t iter_1;
-      bson_iter_t post_id_child;
-      bson_iter_t timestamp_child;
-      int idx = 0;
-      bson_iter_init(&iter_0, doc);
-      bson_iter_init(&iter_1, doc);
-      while (bson_iter_find_descendant(
-                 &iter_0, std::format("posts.{}.post_id", idx).c_str(),
-                 &post_id_child) &&
-             BSON_ITER_HOLDS_INT64(&post_id_child) &&
-             bson_iter_find_descendant(
-                 &iter_1,
-                 std::format("posts.{}.timestamp", idx).c_str(),
-                 &timestamp_child) &&
-             BSON_ITER_HOLDS_INT64(&timestamp_child)) {
-        auto curr_post_id = bson_iter_int64(&post_id_child);
-        auto curr_timestamp = bson_iter_int64(&timestamp_child);
-        if (idx >= mongo_start) {
-          //In mixed workload condition, post may composed between redis and mongo read
-          //mongodb index will shift and duplicate post_id occurs
-          if ( std::ranges::find(post_ids, curr_post_id) == post_ids.end() ) {
-            post_ids.emplace_back(curr_post_id);
-          }
-        }
-        redis_update_map.insert(std::make_pair(std::to_string(curr_post_id),
-                                               (double)curr_timestamp));
-        bson_iter_init(&iter_0, doc);
-        bson_iter_init(&iter_1, doc);
-        idx++;
-      }
-    }
-    bson_destroy(opts);
-    bson_destroy(query);
-    mongoc_cursor_destroy(cursor);
-    mongoc_collection_destroy(collection);
-    mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
+    ReadPostIdsFromMongo(user_id, mongo_start, stop, span.get(),
+                         post_ids, redis_update_map);
   }
-
-  std::future<std::vector<Post>> post_future =
-      std::async(std::launch::async, [&]() {
-        auto post_client_wrapper = _post_client_pool->Pop();
-        if (!post_client_wrapper) {
-          ServiceException se;
-          se.errorCode = ErrorCode::SE_THRIFT_CONN_ERROR;
-          se.message = "Failed to connect to post-storage-service";
-          throw se;
-        }
-        std::vector<Post> _return_posts;
-        auto post_client = post_client_wrapper->GetClient();
-        try {
-          post_client->ReadPosts(_return_posts, req_id, post_ids,
-                                 writer_text_map);
-        } catch (...) {
-          _post_client_pool->Remove(post_client_wrapper);
-          LOG(error) << "Failed to read posts from post-storage-service";
-          throw;
-        }
-        _post_client_pool->Keepalive(post_client_wrapper);
-        return _return_posts;
-      });
 
   if (!redis_update_map.empty()) {
     auto redis_update_span = opentracing::Tracer::Global()->StartSpan(
         "user_timeline_redis_update_client",
         {opentracing::ChildOf(&span->context())});
     try {
-      if (_redis_client_pool)
-        _redis_client_pool->zadd(std::to_string(user_id),
+      if (_redis.client)
+        _redis.client->zadd(std::to_string(user_id),
                                redis_update_map.begin(),
                                redis_update_map.end());
       else if (IsRedisReplicationEnabled()) {
-          _redis_primary_pool->zadd(std::to_string(user_id),
+          _redis.primary->zadd(std::to_string(user_id),
               redis_update_map.begin(),
               redis_update_map.end());
       }
       else
-        _redis_cluster_client_pool->zadd(std::to_string(user_id),
+        _redis.cluster->zadd(std::to_string(user_id),
                                redis_update_map.begin(),
                                redis_update_map.end());
 
@@ -353,7 +338,8 @@ void UserTimelineHandler::ReadUserTimeline(
   }
 
   try {
-    _return = post_future.get();
+    _return = FetchPostsFromStorage(req_id, post_ids, writer_text_map,
+                                    _post_client_pool);
   } catch (...) {
     LOG(error) << "Failed to get post from post-storage-service";
     throw;

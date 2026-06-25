@@ -2,10 +2,12 @@
 #ifndef SOCIAL_NETWORK_MICROSERVICES_SRC_USERMENTIONSERVICE_USERMENTIONHANDLER_H_
 #define SOCIAL_NETWORK_MICROSERVICES_SRC_USERMENTIONSERVICE_USERMENTIONHANDLER_H_
 
+#include <array>
 #include <bson.h>
 #include <libmemcached/memcached.h>
 #include <libmemcached/util.h>
 #include <mongoc.h>
+#include <vector>
 
 #include "../../gen-cpp/UserMentionService.h"
 #include "../../gen-cpp/social_network_types.h"
@@ -15,6 +17,17 @@
 #include "../utils.h"
 
 namespace social_network {
+
+// Groups the MongoDB resources that need cleanup on error inside
+// PopulateUserMentionFromDoc. Keeping them together reduces the parameter
+// count of that helper (fixes cpp:S107).
+struct MongoCleanupContext {
+  bson_t *query;
+  mongoc_cursor_t *cursor;
+  mongoc_collection_t *collection;
+  mongoc_client_pool_t *client_pool;
+  mongoc_client_t *client;
+};
 
 class UserMentionHandler : public UserMentionServiceIf {
  public:
@@ -28,6 +41,30 @@ class UserMentionHandler : public UserMentionServiceIf {
  private:
   memcached_pool_st *_memcached_client_pool;
   mongoc_client_pool_t *_mongodb_client_pool;
+
+  // Helper: populate new_user_mention from a MongoDB document.
+  // Returns true on success; throws ServiceException if a required field is absent.
+  static bool PopulateUserMentionFromDoc(
+      const bson_t *doc,
+      UserMention &new_user_mention,
+      const MongoCleanupContext &ctx,
+      opentracing::Span *find_span);
+
+  // Helper: drain memcached_mget results into user_mentions; erases found
+  // entries from usernames_not_cached. Throws ServiceException on error.
+  void FetchMemcachedResults(
+      memcached_st *client,
+      int64_t req_id,
+      std::vector<UserMention> &user_mentions,
+      std::map<std::string, bool, std::less<>> &usernames_not_cached,
+      opentracing::Span *get_span);
+
+  // Helper: query MongoDB for all usernames still in usernames_not_cached
+  // and append the results to user_mentions.
+  void LookupUsersInMongo(
+      const std::map<std::string, bool, std::less<>> &usernames_not_cached,
+      std::vector<UserMention> &user_mentions,
+      opentracing::Span *parent_span);
 };
 
 UserMentionHandler::UserMentionHandler(
@@ -35,6 +72,151 @@ UserMentionHandler::UserMentionHandler(
     mongoc_client_pool_t *mongodb_client_pool) {
   _memcached_client_pool = memcached_client_pool;
   _mongodb_client_pool = mongodb_client_pool;
+}
+
+// static helper — extract user_id and username fields from a BSON doc into
+// new_user_mention. Cleans up ctx and throws ServiceException if a field is absent.
+bool UserMentionHandler::PopulateUserMentionFromDoc(
+    const bson_t *doc,
+    UserMention &new_user_mention,
+    const MongoCleanupContext &ctx,
+    opentracing::Span *find_span) {
+  bson_iter_t iter;
+
+  if (!bson_iter_init_find(&iter, doc, "user_id")) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = "Attribute of MongoDB item is not complete";
+    bson_destroy(ctx.query);
+    mongoc_cursor_destroy(ctx.cursor);
+    mongoc_collection_destroy(ctx.collection);
+    mongoc_client_pool_push(ctx.client_pool, ctx.client);
+    find_span->Finish();
+    throw se;
+  }
+  new_user_mention.user_id = bson_iter_value(&iter)->value.v_int64;
+
+  if (!bson_iter_init_find(&iter, doc, "username")) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = "Attribute of MongoDB item is not complete";
+    bson_destroy(ctx.query);
+    mongoc_cursor_destroy(ctx.cursor);
+    mongoc_collection_destroy(ctx.collection);
+    mongoc_client_pool_push(ctx.client_pool, ctx.client);
+    find_span->Finish();
+    throw se;
+  }
+  new_user_mention.username = bson_iter_value(&iter)->value.v_utf8.str;
+  return true;
+}
+
+// Drain memcached_mget results into user_mentions; erase found entries from
+// usernames_not_cached. Throws ServiceException on fetch error.
+void UserMentionHandler::FetchMemcachedResults(
+    memcached_st *client,
+    int64_t req_id,
+    std::vector<UserMention> &user_mentions,
+    std::map<std::string, bool, std::less<>> &usernames_not_cached,
+    opentracing::Span *get_span) {
+  std::array<char, MEMCACHED_MAX_KEY> return_key{};
+  size_t return_key_length;
+  char *return_value;
+  size_t return_value_length;
+  uint32_t flags;
+  memcached_return_t rc;
+
+  while (true) {
+    return_value = memcached_fetch(client, return_key.data(), &return_key_length,
+                                   &return_value_length, &flags, &rc);
+    std::unique_ptr<char, void (*)(char *)> rv_guard(return_value,
+                                                     [](char *p) { bson_free(p); });
+    if (return_value == nullptr) {
+      LOG(debug) << "Memcached mget finished "
+                 << memcached_strerror(client, rc);
+      break;
+    }
+    if (rc != MEMCACHED_SUCCESS) {
+      memcached_quit(client);
+      memcached_pool_push(_memcached_client_pool, client);
+      LOG(error) << "Cannot get components of request " << req_id;
+      ServiceException se;
+      se.errorCode = ErrorCode::SE_MEMCACHED_ERROR;
+      se.message = std::format("Cannot get usernames of request {}", req_id);
+      get_span->Finish();
+      throw se;
+    }
+    UserMention new_user_mention;
+    std::string username(return_key.data(), return_key.data() + return_key_length);
+    username = username.substr(0, username.length() - std::strlen(":user_id"));
+    new_user_mention.username = username;
+    new_user_mention.user_id = std::stoul(
+        std::string(return_value, return_value + return_value_length));
+    user_mentions.emplace_back(new_user_mention);
+    usernames_not_cached.erase(username);
+  }
+}
+
+// Query MongoDB for all usernames still in usernames_not_cached and append
+// results to user_mentions.
+void UserMentionHandler::LookupUsersInMongo(
+    const std::map<std::string, bool, std::less<>> &usernames_not_cached,
+    std::vector<UserMention> &user_mentions,
+    opentracing::Span *parent_span) {
+  mongoc_client_t *mongodb_client =
+      mongoc_client_pool_pop(_mongodb_client_pool);
+  if (!mongodb_client) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = "Failed to pop a client from MongoDB pool";
+    throw se;
+  }
+
+  auto collection =
+      mongoc_client_get_collection(mongodb_client, "user", "user");
+  if (!collection) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = "Failed to create collection user from DB user";
+    mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
+    throw se;
+  }
+
+  bson_t *query = bson_new();
+  bson_t query_child_0;
+  bson_t query_username_list;
+  const char *key;
+  int idx = 0;
+  std::array<char, 16> buf;
+
+  BSON_APPEND_DOCUMENT_BEGIN(query, "username", &query_child_0);
+  BSON_APPEND_ARRAY_BEGIN(&query_child_0, "$in", &query_username_list);
+  for (auto &[username, cached] : usernames_not_cached) {
+    bson_uint32_to_string(idx, &key, buf.data(), buf.size());
+    BSON_APPEND_UTF8(&query_username_list, key, username.c_str());
+    idx++;
+  }
+  bson_append_array_end(&query_child_0, &query_username_list);
+  bson_append_document_end(query, &query_child_0);
+
+  auto find_span = opentracing::Tracer::Global()->StartSpan(
+      "compose_user_mentions_mongo_find_client",
+      {opentracing::ChildOf(&parent_span->context())});
+  mongoc_cursor_t *cursor =
+      mongoc_collection_find_with_opts(collection, query, nullptr, nullptr);
+  const bson_t *doc;
+
+  MongoCleanupContext ctx{query, cursor, collection, _mongodb_client_pool, mongodb_client};
+  while (mongoc_cursor_next(cursor, &doc)) {
+    UserMention new_user_mention;
+    PopulateUserMentionFromDoc(doc, new_user_mention, ctx, find_span.get());
+    user_mentions.emplace_back(new_user_mention);
+  }
+  bson_destroy(query);
+  mongoc_cursor_destroy(cursor);
+  mongoc_collection_destroy(collection);
+  mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
+  find_span->Finish();
 }
 
 void UserMentionHandler::ComposeUserMentions(
@@ -69,23 +251,27 @@ void UserMentionHandler::ComposeUserMentions(
       throw se;
     }
 
-    char **keys;
-    size_t *key_sizes;
-    keys = new char *[usernames.size()];
-    key_sizes = new size_t[usernames.size()];
-    int idx = 0;
+    // Build key arrays using vectors to avoid raw new/delete
+    std::vector<std::vector<char>> key_storage;
+    std::vector<char *> keys;
+    std::vector<size_t> key_sizes;
+    key_storage.reserve(usernames.size());
+    keys.reserve(usernames.size());
+    key_sizes.reserve(usernames.size());
+
     for (auto &username : usernames) {
       std::string key_str = username + ":user_id";
-      keys[idx] = new char[key_str.length() + 1];
-      memcpy(keys[idx], key_str.c_str(), key_str.length() + 1);
-      key_sizes[idx] = key_str.length();
-      idx++;
+      std::vector<char> buf(key_str.begin(), key_str.end());
+      buf.push_back('\0');
+      key_sizes.push_back(key_str.length());
+      key_storage.push_back(std::move(buf));
+      keys.push_back(key_storage.back().data());
     }
 
     auto get_span = opentracing::Tracer::Global()->StartSpan(
         "compose_user_mentions_memcached_get_client",
         {opentracing::ChildOf(&span->context())});
-    rc = memcached_mget(client, keys, key_sizes, usernames.size());
+    rc = memcached_mget(client, keys.data(), key_sizes.data(), usernames.size());
     if (rc != MEMCACHED_SUCCESS) {
       LOG(error) << "Cannot get usernames of request " << req_id << ": "
                  << memcached_strerror(client, rc);
@@ -97,133 +283,16 @@ void UserMentionHandler::ComposeUserMentions(
       throw se;
     }
 
-    char return_key[MEMCACHED_MAX_KEY];
-    size_t return_key_length;
-    char *return_value;
-    size_t return_value_length;
-    uint32_t flags;
-
-    while (true) {
-      return_value = memcached_fetch(client, return_key, &return_key_length,
-                                     &return_value_length, &flags, &rc);
-      std::unique_ptr<char, void (*)(char *)> rv_guard(return_value,
-                                                       [](char *p) { std::free(p); });
-      if (return_value == nullptr) {
-        LOG(debug) << "Memcached mget finished "
-                   << memcached_strerror(client, rc);
-        break;
-      }
-      if (rc != MEMCACHED_SUCCESS) {
-        memcached_quit(client);
-        memcached_pool_push(_memcached_client_pool, client);
-        LOG(error) << "Cannot get components of request " << req_id;
-        ServiceException se;
-        se.errorCode = ErrorCode::SE_MEMCACHED_ERROR;
-        se.message =
-            std::format("Cannot get usernames of request {}", req_id);
-        get_span->Finish();
-        throw se;
-      }
-      UserMention new_user_mention;
-      std::string username(return_key, return_key + return_key_length);
-      username =
-          username.substr(0, username.length() - std::strlen(":user_id"));
-      new_user_mention.username = username;
-      new_user_mention.user_id = std::stoul(
-          std::string(return_value, return_value + return_value_length));
-      user_mentions.emplace_back(new_user_mention);
-      usernames_not_cached.erase(username);
-    }
+    FetchMemcachedResults(client, req_id, user_mentions, usernames_not_cached,
+                          get_span.get());
     memcached_quit(client);
     memcached_pool_push(_memcached_client_pool, client);
     get_span->Finish();
-    for (int i = 0; i < usernames.size(); ++i) {
-      delete keys[i];
-    }
-    delete[] keys;
-    delete[] key_sizes;
+    // key_storage is automatically freed when it goes out of scope
 
     // Find the rest in MongoDB
     if (!usernames_not_cached.empty()) {
-      mongoc_client_t *mongodb_client =
-          mongoc_client_pool_pop(_mongodb_client_pool);
-      if (!mongodb_client) {
-        ServiceException se;
-        se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-        se.message = "Failed to pop a client from MongoDB pool";
-        throw se;
-      }
-
-      auto collection =
-          mongoc_client_get_collection(mongodb_client, "user", "user");
-      if (!collection) {
-        ServiceException se;
-        se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-        se.message = "Failed to create collection user from DB user";
-        mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
-        throw se;
-      }
-
-      bson_t *query = bson_new();
-      bson_t query_child_0;
-      bson_t query_username_list;
-      const char *key;
-      idx = 0;
-      char buf[16];
-
-      BSON_APPEND_DOCUMENT_BEGIN(query, "username", &query_child_0);
-      BSON_APPEND_ARRAY_BEGIN(&query_child_0, "$in", &query_username_list);
-      for (auto &[username, cached] : usernames_not_cached) {
-        bson_uint32_to_string(idx, &key, buf, sizeof buf);
-        BSON_APPEND_UTF8(&query_username_list, key, username.c_str());
-        idx++;
-      }
-      bson_append_array_end(&query_child_0, &query_username_list);
-      bson_append_document_end(query, &query_child_0);
-
-      auto find_span = opentracing::Tracer::Global()->StartSpan(
-          "compose_user_mentions_mongo_find_client",
-          {opentracing::ChildOf(&span->context())});
-      mongoc_cursor_t *cursor =
-          mongoc_collection_find_with_opts(collection, query, nullptr, nullptr);
-      const bson_t *doc;
-
-      while (mongoc_cursor_next(cursor, &doc)) {
-        bson_iter_t iter;
-        UserMention new_user_mention;
-        if (bson_iter_init_find(&iter, doc, "user_id")) {
-          new_user_mention.user_id = bson_iter_value(&iter)->value.v_int64;
-        } else {
-          ServiceException se;
-          se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-          se.message = "Attribute of MongoDB item is not complete";
-          bson_destroy(query);
-          mongoc_cursor_destroy(cursor);
-          mongoc_collection_destroy(collection);
-          mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
-          find_span->Finish();
-          throw se;
-        }
-        if (bson_iter_init_find(&iter, doc, "username")) {
-          new_user_mention.username = bson_iter_value(&iter)->value.v_utf8.str;
-        } else {
-          ServiceException se;
-          se.errorCode = ErrorCode::SE_MONGODB_ERROR;
-          se.message = "Attribute of MongoDB item is not complete";
-          bson_destroy(query);
-          mongoc_cursor_destroy(cursor);
-          mongoc_collection_destroy(collection);
-          mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
-          find_span->Finish();
-          throw se;
-        }
-        user_mentions.emplace_back(new_user_mention);
-      }
-      bson_destroy(query);
-      mongoc_cursor_destroy(cursor);
-      mongoc_collection_destroy(collection);
-      mongoc_client_pool_push(_mongodb_client_pool, mongodb_client);
-      find_span->Finish();
+      LookupUsersInMongo(usernames_not_cached, user_mentions, span.get());
     }
   }
 

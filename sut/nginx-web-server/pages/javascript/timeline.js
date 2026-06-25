@@ -1,18 +1,21 @@
+function applyPostToCard(els, i, post_json) {
+    if (i === els.cards.length - 1) {
+        document.getElementById("card-block").appendChild(els.cards[i].cloneNode(true));
+    }
+    els.cards[i].style.display = "block";
+    els.texts[i].innerHTML = replaceMentionWithHTMLLinks(post_json["text"]);
+    els.times[i].innerText = getTime(post_json["timestamp"]);
+    els.creators[i].innerText = post_json["creator"]["username"];
+    for (const media of post_json["media"]) {
+        els.images[i].src = globalThis.location.protocol + "//" + globalThis.location.hostname +
+            ":8081/get-media/?filename=" + media["media_id"] + "." + media["media_type"];
+    }
+}
+
 function renderPosts(resp_json, els) {
     let validPost = 0;
     for (let i = 0; i < resp_json.length; i++) {
-        if (i === els.cards.length - 1) {
-            document.getElementById("card-block").appendChild(els.cards[i].cloneNode(true));
-        }
-        const post_json = resp_json[i];
-        els.cards[i].style.display = "block";
-        els.texts[i].innerHTML = replaceMentionWithHTMLLinks(post_json["text"]);
-        els.times[i].innerText = getTime(post_json["timestamp"]);
-        els.creators[i].innerText = post_json["creator"]["username"];
-        for (const media of post_json["media"]) {
-            els.images[i].src = globalThis.location.protocol + "//" + globalThis.location.hostname +
-                ":8081/get-media/?filename=" + media["media_id"] + "." + media["media_type"];
-        }
+        applyPostToCard(els, i, resp_json[i]);
         validPost += 1;
     }
     if (validPost === 0) {
@@ -69,21 +72,11 @@ function collectPostElements() {
 function renderMentionedPosts(resp_json, mentioned_user, els) {
     let validPost = 0;
     for (let i = 0; i < resp_json.length; i++) {
-        if (i === els.cards.length - 1) {
-            document.getElementById("card-block").appendChild(els.cards[i].cloneNode(true));
-        }
         const post_json = resp_json[i];
         if (post_json["creator"]["username"].localeCompare(mentioned_user) !== 0) {
             continue;
         }
-        els.cards[i].style.display = "block";
-        els.texts[i].innerHTML = replaceMentionWithHTMLLinks(post_json["text"]);
-        els.times[i].innerText = getTime(post_json["timestamp"]);
-        els.creators[i].innerText = post_json["creator"]["username"];
-        for (const media of post_json["media"]) {
-            els.images[i].src = globalThis.location.protocol + "//" + globalThis.location.hostname +
-                ":8081/get-media/?filename=" + media["media_id"] + "." + media["media_type"];
-        }
+        applyPostToCard(els, i, post_json);
         validPost += 1;
     }
     if (validPost === 0) {
@@ -111,12 +104,7 @@ function show_Mentioned_User_Timeline(mentioned_user) {
     Http.send(null);
 }
 
-function showUsername() {
-    const username = localStorage.getItem("username");
-    if (username != null) {
-        document.getElementById("username").innerText = username;
-    }
-}
+// showUsername is defined in utils.js
 
 function getTime(time) {
     const date = new Date(Number(time));
@@ -129,17 +117,6 @@ function replaceMentionWithHTMLLinks(text) {
     return text.replace(/(^|\s)@(\w+)/g, '$1<a href="profile.html?username=$2">@$2</a>');
 }
 
-function get_follower() {
-    const Http = new XMLHttpRequest();
-    const url = globalThis.location.origin + '/api/user/get_follower';
-    Http.open("GET", url, true);
-    Http.onreadystatechange = function () {
-        if (this.readyState === 4 && this.status === 200) {
-            console.log(JSON.parse(Http.responseText));
-        }
-    };
-    Http.send(null);
-}
 
 function logout() {
     localStorage.clear();

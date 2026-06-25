@@ -14,6 +14,7 @@
 #include "../ThriftClient.h"
 #include "../logger.h"
 #include "../tracing.h"
+#include "../utils_redis.h"
 
 using namespace sw::redis;
 namespace social_network {
@@ -44,10 +45,7 @@ class HomeTimelineHandler : public HomeTimelineServiceIf {
                          const std::map<std::string, std::string, std::less<>> &) override;
 
  private:
-     Redis *_redis_replica_pool;
-     Redis *_redis_primary_pool;
-     Redis *_redis_client_pool;
-     RedisCluster *_redis_cluster_client_pool;
+     RedisPoolSet _redis;
      ClientPool<ThriftClient<PostStorageServiceClient>> *_post_client_pool;
      ClientPool<ThriftClient<SocialGraphServiceClient>> *_social_graph_client_pool;
 };
@@ -55,45 +53,30 @@ class HomeTimelineHandler : public HomeTimelineServiceIf {
 HomeTimelineHandler::HomeTimelineHandler(
     Redis *redis_pool,
     ClientPool<ThriftClient<PostStorageServiceClient>> *post_client_pool,
-    ClientPool<ThriftClient<SocialGraphServiceClient>>
-        *social_graph_client_pool) {
-    _redis_primary_pool = nullptr;
-    _redis_replica_pool = nullptr;
-    _redis_client_pool = redis_pool;
-    _redis_cluster_client_pool = nullptr;
-    _post_client_pool = post_client_pool;
-    _social_graph_client_pool = social_graph_client_pool;
-}
+    ClientPool<ThriftClient<SocialGraphServiceClient>> *social_graph_client_pool)
+    : _redis(RedisPoolSet::Standalone(redis_pool)),
+      _post_client_pool(post_client_pool),
+      _social_graph_client_pool(social_graph_client_pool) {}
 
 HomeTimelineHandler::HomeTimelineHandler(
     RedisCluster *redis_pool,
     ClientPool<ThriftClient<PostStorageServiceClient>> *post_client_pool,
-    ClientPool<ThriftClient<SocialGraphServiceClient>>
-        *social_graph_client_pool) {
-    _redis_primary_pool = nullptr;
-    _redis_replica_pool = nullptr;
-    _redis_client_pool = nullptr;
-    _redis_cluster_client_pool = redis_pool; 
-    _post_client_pool = post_client_pool;
-    _social_graph_client_pool = social_graph_client_pool;
-}
+    ClientPool<ThriftClient<SocialGraphServiceClient>> *social_graph_client_pool)
+    : _redis(RedisPoolSet::Cluster(redis_pool)),
+      _post_client_pool(post_client_pool),
+      _social_graph_client_pool(social_graph_client_pool) {}
 
 HomeTimelineHandler::HomeTimelineHandler(
     Redis *redis_replica_pool,
     Redis *redis_primary_pool,
-    ClientPool<ThriftClient<PostStorageServiceClient>>* post_client_pool,
-    ClientPool<ThriftClient<SocialGraphServiceClient>>
-    * social_graph_client_pool) {
-    _redis_primary_pool = redis_primary_pool;
-    _redis_replica_pool = redis_replica_pool;
-    _redis_client_pool = nullptr;
-    _redis_cluster_client_pool = nullptr;
-    _post_client_pool = post_client_pool;
-    _social_graph_client_pool = social_graph_client_pool;
-}
+    ClientPool<ThriftClient<PostStorageServiceClient>> *post_client_pool,
+    ClientPool<ThriftClient<SocialGraphServiceClient>> *social_graph_client_pool)
+    : _redis(RedisPoolSet::Replication(redis_replica_pool, redis_primary_pool)),
+      _post_client_pool(post_client_pool),
+      _social_graph_client_pool(social_graph_client_pool) {}
 
 bool HomeTimelineHandler::IsRedisReplicationEnabled() {
-    return (_redis_primary_pool || _redis_replica_pool);
+  return _redis.IsReplicationEnabled();
 }
 
 void HomeTimelineHandler::WriteHomeTimeline(
@@ -144,8 +127,8 @@ void HomeTimelineHandler::WriteHomeTimeline(
   std::string post_id_str = std::to_string(post_id);
 
   {
-    if (_redis_client_pool) {
-      auto pipe = _redis_client_pool->pipeline(false);
+    if (_redis.client) {
+      auto pipe = _redis.client->pipeline(false);
       for (auto &follower_id : followers_id_set) {
         pipe.zadd(std::to_string(follower_id), post_id_str, timestamp,
                   UpdateType::NOT_EXIST);
@@ -159,7 +142,7 @@ void HomeTimelineHandler::WriteHomeTimeline(
     }
     
     else if (IsRedisReplicationEnabled()) {
-        auto pipe = _redis_primary_pool->pipeline(false);
+        auto pipe = _redis.primary->pipeline(false);
         for (auto& follower_id : followers_id_set) {
             pipe.zadd(std::to_string(follower_id), post_id_str, timestamp,
                 UpdateType::NOT_EXIST);
@@ -176,13 +159,13 @@ void HomeTimelineHandler::WriteHomeTimeline(
     else {
       // Create multi-pipeline that match with shards pool
       std::map<std::shared_ptr<ConnectionPool>, std::shared_ptr<Pipeline>> pipe_map;
-      auto *shards_pool = _redis_cluster_client_pool->get_shards_pool();
+      auto *shards_pool = _redis.cluster->get_shards_pool();
 
       for (auto &follower_id : followers_id_set) {
         auto conn = shards_pool->fetch(std::to_string(follower_id));
         auto pipe = pipe_map.find(conn);
         if(pipe == pipe_map.end()) {//Not found, create new pipeline and insert
-          auto new_pipe = std::make_shared<Pipeline>(_redis_cluster_client_pool->pipeline(std::to_string(follower_id), false));
+          auto new_pipe = std::make_shared<Pipeline>(_redis.cluster->pipeline(std::to_string(follower_id), false));
           pipe_map.emplace(conn, new_pipe);
           auto *_pipe = new_pipe.get();
           _pipe->zadd(std::to_string(follower_id), post_id_str, timestamp,
@@ -232,19 +215,19 @@ void HomeTimelineHandler::ReadHomeTimeline(
 
   std::vector<std::string> post_ids_str;
   try {
-    if (_redis_client_pool) {
-      _redis_client_pool->zrevrange(std::to_string(user_id), start_idx,
+    if (_redis.client) {
+      _redis.client->zrevrange(std::to_string(user_id), start_idx,
                                     stop_idx - 1,
                                     std::back_inserter(post_ids_str));
     }
     else if (IsRedisReplicationEnabled()) {
-        _redis_replica_pool->zrevrange(std::to_string(user_id), start_idx,
+        _redis.replica->zrevrange(std::to_string(user_id), start_idx,
                                        stop_idx - 1,
                                        std::back_inserter(post_ids_str));
     }
     
     else {
-      _redis_cluster_client_pool->zrevrange(std::to_string(user_id), start_idx,
+      _redis.cluster->zrevrange(std::to_string(user_id), start_idx,
                                             stop_idx - 1,
                                             std::back_inserter(post_ids_str));
     }

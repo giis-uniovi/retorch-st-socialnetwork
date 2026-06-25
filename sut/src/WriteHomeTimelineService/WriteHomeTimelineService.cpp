@@ -21,6 +21,22 @@ using namespace social_network;
 
 [[noreturn]] void sigintHandler(int) { exit(EXIT_SUCCESS); }
 
+static void GetFollowersWithErrorHandling(
+    SocialGraphServiceClient *social_graph_client,
+    ClientPool<ThriftClient<SocialGraphServiceClient>> *social_graph_client_pool,
+    std::shared_ptr<ThriftClient<SocialGraphServiceClient>> &social_graph_client_wrapper,
+    std::vector<int64_t> &followers_id, int64_t req_id, int64_t user_id,
+    std::map<std::string, std::string, std::less<>> &writer_text_map) {
+  try {
+    social_graph_client->GetFollowers(followers_id, req_id, user_id,
+                                      writer_text_map);
+  } catch (...) {
+    LOG(error) << "Failed to get followers from social-network-service";
+    social_graph_client_pool->Remove(social_graph_client_wrapper);
+    throw;
+  }
+}
+
 void OnReceivedWorker(
     const AMQP::Message &msg,
     ClientPool<RedisClient> *redis_client_pool,
@@ -30,9 +46,8 @@ void OnReceivedWorker(
     json msg_json = json::parse(std::string(msg.body(), msg.bodySize()));
 
     std::map<std::string, std::string, std::less<>> carrier;
-    for (auto it = msg_json["carrier"].begin(); it != msg_json["carrier"].end();
-         ++it) {
-      carrier.try_emplace(it.key(), it.value());
+    for (const auto &[key, value] : msg_json["carrier"].items()) {
+      carrier.try_emplace(key, value);
     }
 
     // Jaeger tracing
@@ -65,14 +80,9 @@ void OnReceivedWorker(
     }
     auto social_graph_client = social_graph_client_wrapper->GetClient();
     std::vector<int64_t> followers_id;
-    try {
-      social_graph_client->GetFollowers(followers_id, req_id, user_id,
-                                        writer_text_map);
-    } catch (...) {
-      LOG(error) << "Failed to get followers from social-network-service";
-      social_graph_client_pool->Remove(social_graph_client_wrapper);
-      throw;
-    }
+    GetFollowersWithErrorHandling(social_graph_client, social_graph_client_pool,
+                                  social_graph_client_wrapper, followers_id,
+                                  req_id, user_id, writer_text_map);
     social_graph_client_pool->Keepalive(social_graph_client_wrapper);
     followers_span->Finish();
 
@@ -95,7 +105,7 @@ void OnReceivedWorker(
     std::vector<std::string> options{"NX"};
     std::string post_id_str = std::to_string(post_id);
     std::string timestamp_str = std::to_string(timestamp);
-    std::multimap<std::string, std::string> value = {
+    std::multimap<std::string, std::string, std::less<>> value = {
         {timestamp_str, post_id_str}};
 
     for (auto &follower_id : followers_id_set) {
@@ -194,7 +204,7 @@ int main(int argc, char *argv[]) {
       social_graph_service_port, 0, social_graph_service_conns,
       social_graph_service_timeout, social_graph_service_keepalive, config_json);
 
-  std::unique_ptr<std::jthread> threads_ptr[n_workers];
+  std::vector<std::unique_ptr<std::jthread>> threads_ptr(n_workers);
   for (auto &thread_ptr : threads_ptr) {
     thread_ptr = std::make_unique<std::jthread>(
         WorkerThread, std::ref(rabbitmq_addr), rabbitmq_port,

@@ -1,19 +1,12 @@
 #include <signal.h>
-#include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/server/TThreadedServer.h>
-#include <thrift/transport/TBufferTransports.h>
-#include <thrift/transport/TServerSocket.h>
 
 #include "../utils.h"
 #include "../utils_memcached.h"
 #include "../utils_mongodb.h"
+#include "../utils_service.h"
 #include "../utils_thrift.h"
 #include "UserHandler.h"
 
-using apache::thrift::protocol::TBinaryProtocolFactory;
-using apache::thrift::server::TThreadedServer;
-using apache::thrift::transport::TFramedTransportFactory;
-using apache::thrift::transport::TServerSocket;
 using namespace social_network;
 
 [[noreturn]] void sigintHandler(int) { exit(EXIT_SUCCESS); }
@@ -41,10 +34,8 @@ int main(int argc, char *argv[]) {
       config_json["social-graph-service"]["keepalive_ms"];
 
   int mongodb_conns = config_json["user-mongodb"]["connections"];
-  int mongodb_timeout = config_json["user-mongodb"]["timeout_ms"];
 
   int memcached_conns = config_json["user-memcached"]["connections"];
-  int memcached_timeout = config_json["user-memcached"]["timeout_ms"];
 
   memcached_pool_st *memcached_client_pool =
       init_memcached_client_pool(config_json, "user", 32, memcached_conns);
@@ -68,29 +59,15 @@ int main(int argc, char *argv[]) {
       "social-graph", social_graph_addr, social_graph_port, 0,
       social_graph_conns, social_graph_timeout, social_graph_keepalive, config_json);
 
-  mongoc_client_t *mongodb_client = mongoc_client_pool_pop(mongodb_client_pool);
-  if (!mongodb_client) {
-    LOG(fatal) << "Failed to pop mongoc client";
+  if (create_mongodb_index_with_retry(mongodb_client_pool, "user", "user_id") != EXIT_SUCCESS) {
     return EXIT_FAILURE;
   }
-  bool r = false;
-  while (!r) {
-    r = CreateIndex(mongodb_client, "user", "user_id", true);
-    if (!r) {
-      LOG(error) << "Failed to create mongodb index, try again";
-      sleep(1);
-    }
-  }
-  mongoc_client_pool_push(mongodb_client_pool, mongodb_client);
   std::shared_ptr<TServerSocket> server_socket = get_server_socket(config_json, "0.0.0.0", port);
 
-  TThreadedServer server(
+  start_thrift_server(
       std::make_shared<UserServiceProcessor>(std::make_shared<UserHandler>(
           &thread_lock, machine_id, secret, memcached_client_pool,
           mongodb_client_pool, &social_graph_client_pool)),
       server_socket,
-      std::make_shared<TFramedTransportFactory>(),
-      std::make_shared<TBinaryProtocolFactory>());
-  LOG(info) << "Starting the user-service server ...";
-  server.serve();
+      "Starting the user-service server ...");
 }
