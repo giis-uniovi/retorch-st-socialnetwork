@@ -19,6 +19,8 @@ import java.io.IOException;
  */
 class TestApiPosts extends BaseApiClass {
 
+    private static final String READPATH = "/read";
+
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -50,7 +52,7 @@ class TestApiPosts extends BaseApiClass {
 
         composePost(username, userId, postText);
 
-        String url = wrk2UserTimelineUrl("/read") + "?user_id=" + userId + "&start=0&stop=10";
+        String url = wrk2UserTimelineUrl(READPATH) + "?user_id=" + userId + "&start=0&stop=10";
         JsonArray timeline = getJsonArray(url);
         Assertions.assertFalse(timeline.isEmpty(), "User timeline must contain at least one post after composing");
 
@@ -81,7 +83,7 @@ class TestApiPosts extends BaseApiClass {
 
         composePost(authorName, authorId, "hi @" + mentionedName + " " + unique());
 
-        String url = wrk2UserTimelineUrl("/read") + "?user_id=" + authorId + "&start=0&stop=10";
+        String url = wrk2UserTimelineUrl(READPATH) + "?user_id=" + authorId + "&start=0&stop=10";
         JsonArray timeline = getJsonArray(url);
         Assertions.assertFalse(timeline.isEmpty(), "Author timeline must contain the composed post");
 
@@ -94,7 +96,7 @@ class TestApiPosts extends BaseApiClass {
     @Test
     @DisplayName("GET /wrk2-api/user-timeline/read with missing args returns HTTP 400")
     void testReadUserTimelineBadRequest() throws IOException {
-        int status = getStatus(wrk2UserTimelineUrl("/read"));
+        int status = getStatus(wrk2UserTimelineUrl(READPATH));
         Assertions.assertEquals(400, status, "Timeline read without required params must return HTTP 400");
     }
 }

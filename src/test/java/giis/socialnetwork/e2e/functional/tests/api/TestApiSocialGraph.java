@@ -20,6 +20,8 @@ import java.io.IOException;
  */
 class TestApiSocialGraph extends BaseApiClass {
 
+    private static final String FOLLOWEEID = "followee_id";
+
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
@@ -67,7 +69,7 @@ class TestApiSocialGraph extends BaseApiClass {
         loginUser(userA[0], userA[2]);
 
         JsonArray followees = getFollowees();
-        Assertions.assertTrue(containsByField(followees, "followee_id", userBId),
+        Assertions.assertTrue(containsByField(followees, FOLLOWEEID, userBId),
                 "User B (id=" + userBId + ") must appear in A's followee list");
     }
 
@@ -90,8 +92,8 @@ class TestApiSocialGraph extends BaseApiClass {
 
         JsonArray before = getFollowees();
         Assertions.assertAll(
-                () -> Assertions.assertTrue(containsByField(before, "followee_id", userBId), "B must be followed initially"),
-                () -> Assertions.assertTrue(containsByField(before, "followee_id", userCId), "C must be followed initially")
+                () -> Assertions.assertTrue(containsByField(before, FOLLOWEEID, userBId), "B must be followed initially"),
+                () -> Assertions.assertTrue(containsByField(before, FOLLOWEEID, userCId), "C must be followed initially")
         );
 
         int status = unfollowUser(userA[0], userB[0]);
@@ -99,8 +101,8 @@ class TestApiSocialGraph extends BaseApiClass {
 
         JsonArray after = getFollowees();
         Assertions.assertAll(
-                () -> Assertions.assertFalse(containsByField(after, "followee_id", userBId), "B must be gone after unfollow"),
-                () -> Assertions.assertTrue(containsByField(after, "followee_id", userCId), "C must still be followed")
+                () -> Assertions.assertFalse(containsByField(after, FOLLOWEEID, userBId), "B must be gone after unfollow"),
+                () -> Assertions.assertTrue(containsByField(after, FOLLOWEEID, userCId), "C must still be followed")
         );
     }
 }

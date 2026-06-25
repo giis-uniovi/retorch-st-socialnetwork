@@ -15,17 +15,17 @@ public class Waiter {
     private static final Logger log = LoggerFactory.getLogger(Waiter.class);
     private static final int NAV_WAIT_SECONDS = 30;
     private static final int WAIT_DEFAULT = 10;
-    private final WebDriverWait waiter;
+    private final WebDriverWait genericWaiter;
     private final WebDriverWait navWaiter;
 
     public Waiter(WebDriver driver) {
-        waiter = new WebDriverWait(driver, Duration.ofSeconds(WAIT_DEFAULT));
+        genericWaiter = new WebDriverWait(driver, Duration.ofSeconds(WAIT_DEFAULT));
         navWaiter = new WebDriverWait(driver, Duration.ofSeconds(NAV_WAIT_SECONDS));
     }
 
     public void waitUntil(ExpectedCondition<?> condition, String errorMessage) {
         try {
-            this.waiter.until(condition);
+            this.genericWaiter.until(condition);
         } catch (org.openqa.selenium.TimeoutException timeout) {
             log.error(errorMessage);
             throw new org.openqa.selenium.TimeoutException(

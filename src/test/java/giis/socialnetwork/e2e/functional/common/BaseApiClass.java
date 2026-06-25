@@ -47,6 +47,8 @@ public class BaseApiClass {
     protected static String sutUrl;
     protected static String tJobName;
 
+    protected static final String READPATH = "/read";
+
     @BeforeAll
     static void setupAll() throws IOException {
         log.info("Starting API test global setup");

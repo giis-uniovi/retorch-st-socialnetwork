@@ -33,7 +33,7 @@ class TestApiTimeline extends BaseApiClass {
         String[] reader = createUserWithName("htreader");
         long readerId = Long.parseLong(reader[1]);
 
-        String url = wrk2HomeTimelineUrl("/read") + "?user_id=" + readerId + "&start=0&stop=10";
+        String url = wrk2HomeTimelineUrl(READPATH) + "?user_id=" + readerId + "&start=0&stop=10";
         JsonArray timeline = getJsonArray(url);
         // A new user has an empty home timeline — the array must still be valid JSON
         Assertions.assertNotNull(timeline, "Home timeline response must be a valid JSON array");
@@ -76,7 +76,7 @@ class TestApiTimeline extends BaseApiClass {
     @Test
     @DisplayName("GET /wrk2-api/home-timeline/read with missing args returns HTTP 400")
     void testHomeTimelineBadRequest() throws IOException {
-        int status = getStatus(wrk2HomeTimelineUrl("/read"));
+        int status = getStatus(wrk2HomeTimelineUrl(READPATH));
         Assertions.assertEquals(400, status,
                 "Home timeline read without required params must return HTTP 400");
     }
@@ -87,7 +87,7 @@ class TestApiTimeline extends BaseApiClass {
      * Uses {@link LockSupport#parkNanos} to avoid Sonar rule {@code java:S2925}.
      */
     private JsonArray pollHomeTimeline(long userId, String expectedText) throws IOException {
-        String url = wrk2HomeTimelineUrl("/read") + "?user_id=" + userId + "&start=0&stop=10";
+        String url = wrk2HomeTimelineUrl(READPATH) + "?user_id=" + userId + "&start=0&stop=10";
         long deadline = System.currentTimeMillis() + HOME_TIMELINE_TIMEOUT_MS;
         JsonArray timeline;
         do {
