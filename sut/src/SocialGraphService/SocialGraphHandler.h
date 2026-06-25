@@ -622,36 +622,44 @@ void SocialGraphHandler::Unfollow(
   span->Finish();
 }
 
-void SocialGraphHandler::GetFollowers(
-    std::vector<int64_t> &_return, const int64_t req_id, const int64_t user_id,
-    const std::map<std::string, std::string, std::less<>> &carrier) {
-  std::map<std::string, std::string, std::less<>> writer_text_map;
-  auto span = StartServerSpan("get_followers_server", carrier, writer_text_map);
-
+// Reads a follower/followee id set from Redis into _return. Returns true when
+// the set was present in Redis; false means the caller must fall back to
+// MongoDB. Shared by GetFollowers and GetFollowees to avoid duplicated logic.
+static bool ReadFollowGraphFromRedis(RedisContext &redis_ctx,
+                                     const std::string &key,
+                                     std::vector<int64_t> &_return,
+                                     opentracing::Span *parent_span) {
   auto redis_span = opentracing::Tracer::Global()->StartSpan(
       "social_graph_redis_get_client",
-      {opentracing::ChildOf(&span->context())});
-
-  RedisContext redis_ctx(_redis);
-  std::vector<std::string> followers_str;
-  std::string followers_key = std::format("{}:followers", user_id);
+      {opentracing::ChildOf(&parent_span->context())});
+  std::vector<std::string> ids_str;
   try {
-    ReadFromRedisZSet(redis_ctx, followers_key, followers_str);
+    ReadFromRedisZSet(redis_ctx, key, ids_str);
   } catch (const Error &err) {
     LOG(error) << err.what();
     throw err;
   }
   redis_span->Finish();
 
-  // If user_id in the social graph Redis server, read from Redis
-  if (!followers_str.empty()) {
-    for (auto const &follower_str : followers_str) {
-      _return.emplace_back(std::stoul(follower_str));
-    }
+  if (ids_str.empty()) {
+    return false;
   }
-  // If user_id not in the social graph Redis server, read from MongoDB and
-  // update Redis.
-  else {
+  for (auto const &id_str : ids_str) {
+    _return.emplace_back(std::stoul(id_str));
+  }
+  return true;
+}
+
+void SocialGraphHandler::GetFollowers(
+    std::vector<int64_t> &_return, const int64_t req_id, const int64_t user_id,
+    const std::map<std::string, std::string, std::less<>> &carrier) {
+  std::map<std::string, std::string, std::less<>> writer_text_map;
+  auto span = StartServerSpan("get_followers_server", carrier, writer_text_map);
+
+  RedisContext redis_ctx(_redis);
+  std::string followers_key = std::format("{}:followers", user_id);
+  if (!ReadFollowGraphFromRedis(redis_ctx, followers_key, _return,
+                                span.get())) {
     ReadFollowersFromMongo(_mongodb_client_pool, redis_ctx, user_id,
                            followers_key, _return, span.get());
   }
@@ -664,31 +672,10 @@ void SocialGraphHandler::GetFollowees(
   std::map<std::string, std::string, std::less<>> writer_text_map;
   auto span = StartServerSpan("get_followees_server", carrier, writer_text_map);
 
-  auto redis_span = opentracing::Tracer::Global()->StartSpan(
-      "social_graph_redis_get_client",
-      {opentracing::ChildOf(&span->context())});
-
   RedisContext redis_ctx(_redis);
-  std::vector<std::string> followees_str;
   std::string followees_key = std::format("{}:followees", user_id);
-  try {
-    ReadFromRedisZSet(redis_ctx, followees_key, followees_str);
-  } catch (const Error &err) {
-    LOG(error) << err.what();
-    throw err;
-  }
-  redis_span->Finish();
-
-  // If user_id in the social graph Redis server, read from Redis
-  if (!followees_str.empty()) {
-    for (auto const &followee_str : followees_str) {
-      _return.emplace_back(std::stoul(followee_str));
-    }
-  }
-  // If user_id not in the social graph Redis server, read from MongoDB and
-  // update Redis.
-  else {
-    redis_span->Finish();
+  if (!ReadFollowGraphFromRedis(redis_ctx, followees_key, _return,
+                                span.get())) {
     ReadFolloweesFromMongo(_mongodb_client_pool, redis_ctx, user_id, _return,
                            span.get());
   }
