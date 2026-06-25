@@ -354,15 +354,24 @@ static void WriteToRedisZSet(
 }
 
 // ---------------------------------------------------------------------------
-// Free helper functions for GetFollowers
+// Shared MongoDB query preamble for GetFollowers / GetFollowees
 // ---------------------------------------------------------------------------
 
-static void ReadFollowersFromMongo(
-    mongoc_client_pool_t *mongodb_client_pool,
-    const RedisContext &redis_ctx,
-    int64_t user_id,
-    const std::string &redis_key,
-    std::vector<int64_t> &result,
+// Open MongoDB handles plus the first document matching user_id. Shared by
+// ReadFollowersFromMongo and ReadFolloweesFromMongo so the lookup preamble is
+// not duplicated. The caller owns the returned handles and must destroy them.
+struct SocialGraphQuery {
+  mongoc_client_t *mongodb_client;
+  mongoc_collection_t *collection;
+  bson_t *query;
+  std::unique_ptr<opentracing::Span> find_span;
+  mongoc_cursor_t *cursor;
+  const bson_t *doc;
+  bool found;
+};
+
+static SocialGraphQuery FindSocialGraphByUserId(
+    mongoc_client_pool_t *mongodb_client_pool, int64_t user_id,
     opentracing::Span *parent_span) {
   mongoc_client_t *mongodb_client = PopMongoClient(mongodb_client_pool);
   auto collection = GetMongoCollection(mongodb_client_pool, mongodb_client,
@@ -374,8 +383,25 @@ static void ReadFollowersFromMongo(
       {opentracing::ChildOf(&parent_span->context())});
   mongoc_cursor_t *cursor =
       mongoc_collection_find_with_opts(collection, query, nullptr, nullptr);
-  const bson_t *doc;
+  const bson_t *doc = nullptr;
   bool found = mongoc_cursor_next(cursor, &doc);
+  return SocialGraphQuery{mongodb_client, collection,        query, std::move(find_span),
+                          cursor,         doc,        found};
+}
+
+// ---------------------------------------------------------------------------
+// Free helper functions for GetFollowers
+// ---------------------------------------------------------------------------
+
+static void ReadFollowersFromMongo(
+    mongoc_client_pool_t *mongodb_client_pool,
+    const RedisContext &redis_ctx,
+    int64_t user_id,
+    const std::string &redis_key,
+    std::vector<int64_t> &result,
+    opentracing::Span *parent_span) {
+  auto [mongodb_client, collection, query, find_span, cursor, doc, found] =
+      FindSocialGraphByUserId(mongodb_client_pool, user_id, parent_span);
   if (found) {
     bson_iter_t iter_0;
     bson_iter_t iter_1;
@@ -440,18 +466,8 @@ static void ReadFolloweesFromMongo(
     int64_t user_id,
     std::vector<int64_t> &result,
     opentracing::Span *parent_span) {
-  mongoc_client_t *mongodb_client = PopMongoClient(mongodb_client_pool);
-  auto collection = GetMongoCollection(mongodb_client_pool, mongodb_client,
-                                       "social-graph", "social-graph");
-  bson_t *query = bson_new();
-  BSON_APPEND_INT64(query, "user_id", user_id);
-  auto find_span = opentracing::Tracer::Global()->StartSpan(
-      "social_graph_mongo_find_client",
-      {opentracing::ChildOf(&parent_span->context())});
-  mongoc_cursor_t *cursor =
-      mongoc_collection_find_with_opts(collection, query, nullptr, nullptr);
-  const bson_t *doc;
-  bool found = mongoc_cursor_next(cursor, &doc);
+  auto [mongodb_client, collection, query, find_span, cursor, doc, found] =
+      FindSocialGraphByUserId(mongodb_client_pool, user_id, parent_span);
   if (!found) {
     ServiceException se;
     se.errorCode = ErrorCode::SE_THRIFT_HANDLER_ERROR;
