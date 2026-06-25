@@ -1,10 +1,10 @@
 package giis.socialnetwork.e2e.functional.tests;
 
+import giis.retorch.annotations.AccessMode;
 import giis.socialnetwork.e2e.functional.common.BaseLoggedClass;
 import giis.socialnetwork.e2e.functional.common.ElementNotFoundException;
 import giis.socialnetwork.e2e.functional.pages.ContactPage;
 import giis.socialnetwork.e2e.functional.pages.SignupPage;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,8 +16,8 @@ class TestSocialGraph extends BaseLoggedClass {
     @AccessMode(resID = "frontend", concurrency = 10, sharing = true, accessMode = "READONLY")
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("Following two users then unfollowing one is reflected in the Contact page followee list")
-    void testFollowThenUnfollowViaContactPage() throws ElementNotFoundException {
+    @DisplayName("TestFollowAndUnfollow")
+    void testFollowAndUnfollow() throws ElementNotFoundException {
         long ts = System.currentTimeMillis();
         String userA = "sga" + ts;
         String userB = "sgb" + ts;

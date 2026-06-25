@@ -1,11 +1,11 @@
 package giis.socialnetwork.e2e.functional.common;
 
-import giis.socialnetwork.e2e.functional.utils.Waiter;
 import giis.selema.framework.junit5.LifecycleJunit5;
 import giis.selema.manager.SeleManager;
 import giis.selema.manager.SelemaConfig;
 import giis.selema.services.browser.DynamicGridBrowserService;
 import giis.selema.services.impl.WatermarkService;
+import giis.socialnetwork.e2e.functional.utils.Waiter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;

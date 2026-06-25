@@ -7,10 +7,10 @@ import org.openqa.selenium.WebDriver;
 
 public class LoginPage extends BasePage {
 
-    private static final By USERNAME   = By.name("username");
-    private static final By PASSWORD   = By.name("password");
-    private static final By LOGIN_BTN  = By.cssSelector("input[name='login']");
-    private static final By SIGN_UP    = By.linkText("Sign Up");
+    private static final By USERNAME = By.name("username");
+    private static final By PASSWORD = By.name("password");
+    private static final By LOGIN_BTN = By.cssSelector("input[name='login']");
+    private static final By SIGN_UP = By.linkText("Sign Up");
 
     public LoginPage(WebDriver driver, Waiter waiter, String sutUrl) {
         super(driver, waiter, sutUrl);
@@ -31,7 +31,7 @@ public class LoginPage extends BasePage {
         return new MainPage(driver, waiter, sutUrl);
     }
 
-    public boolean isUsernameDisplayed()   { return isDisplayed(USERNAME); }
-    public boolean isPasswordDisplayed()   { return isDisplayed(PASSWORD); }
-    public boolean isSignUpLinkDisplayed() { return isDisplayed(SIGN_UP); }
+    public boolean isUsernameDisplayed() {return isDisplayed(USERNAME);}
+    public boolean isPasswordDisplayed() {return isDisplayed(PASSWORD);}
+    public boolean isSignUpLinkDisplayed() {return isDisplayed(SIGN_UP);}
 }

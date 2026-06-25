@@ -26,7 +26,7 @@ public abstract class BasePage {
         this.sutUrl = sutUrl;
     }
 
-    /** Navigates to {@code sutUrl + path}; callers follow with a page-specific wait. */
+    /**Navigates to {@code sutUrl + path}; callers follow with a page-specific wait.*/
     protected void navigate(String path) {
         driver.get(sutUrl + path);
     }
@@ -47,7 +47,7 @@ public abstract class BasePage {
         field.sendKeys(value);
     }
 
-    /** Clicks once the element is clickable, falling back to a JS click if it is obscured. */
+    /**Clicks once the element is clickable, falling back to a JS click if it is obscured.*/
     protected void click(By locator) throws ElementNotFoundException {
         waiter.waitUntil(ExpectedConditions.elementToBeClickable(locator), "Element not clickable: " + locator);
         Click.element(driver, driver.findElement(locator));
@@ -61,7 +61,7 @@ public abstract class BasePage {
         return driver.findElement(locator).isDisplayed();
     }
 
-    /** True if at least one element matches — use for containers whose CSS visibility is unreliable. */
+    /*** True if at least one element matches — use for containers whose CSS visibility is unreliable.*/
     protected boolean isPresent(By locator) {
         return !driver.findElements(locator).isEmpty();
     }
