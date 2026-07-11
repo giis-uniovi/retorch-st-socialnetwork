@@ -1,6 +1,7 @@
 package giis.socialnetwork.e2e.functional.utils;
 
 import org.openqa.selenium.By;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.ExpectedCondition;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -25,32 +26,47 @@ public class Waiter {
 
     /*** Login page (index.html) — login form username field.*/
     public void waitForLoginPage() {
-        log.debug("Waiting for login page to load");
-        navWaitUntil(ExpectedConditions.visibilityOfElementLocated(By.name("username")),
-                "Login page did not load");
-    }
-
-    public void navWaitUntil(ExpectedCondition<?> condition, String errorMessage) {
-        try {
-            this.navWaiter.until(condition);
-        } catch (org.openqa.selenium.TimeoutException e) {
-            throw new org.openqa.selenium.TimeoutException(
-                    "\"" + errorMessage + "\" > " + e.getMessage());
-        }
+        waitForPage(By.name("username"), "Login page did not load");
     }
 
     /*** Signup page — first_name field present.*/
     public void waitForSignupPage() {
-        log.debug("Waiting for signup page to load");
-        navWaitUntil(ExpectedConditions.visibilityOfElementLocated(By.name("first_name")),
-                "Signup page did not load");
+        waitForPage(By.name("first_name"), "Signup page did not load");
     }
 
-    /** Contact page — follow form input (always visible).*/
+    /*** Contact page — follow form input (always visible).*/
     public void waitForContactPage() {
-        log.debug("Waiting for contact page to load");
-        navWaitUntil(ExpectedConditions.visibilityOfElementLocated(By.id("followee-name")),
-                "Contact page did not load");
+        waitForPage(By.id("followee-name"), "Contact page did not load");
+    }
+
+    /*** Main feed page (main.html) — navbar brand link.*/
+    public void waitForMainPage() {
+        waitForPage(By.cssSelector("a.navbar-brand"), "Main page did not load");
+    }
+
+    /** Waits (navigation timeout) for the element that marks a page as loaded. */
+    private void waitForPage(By marker, String errorMessage) {
+        log.debug("Waiting for page marker: {}", marker);
+        navWaitUntil(ExpectedConditions.visibilityOfElementLocated(marker), errorMessage);
+    }
+
+    /** Waits with the default (short) timeout. */
+    public void waitUntil(ExpectedCondition<?> condition, String errorMessage) {
+        until(genericWaiter, condition, errorMessage);
+    }
+
+    /** Waits with the longer navigation timeout. */
+    public void navWaitUntil(ExpectedCondition<?> condition, String errorMessage) {
+        until(navWaiter, condition, errorMessage);
+    }
+
+    private static void until(WebDriverWait waiter, ExpectedCondition<?> condition, String errorMessage) {
+        try {
+            waiter.until(condition);
+        } catch (TimeoutException timeout) {
+            log.error(errorMessage);
+            throw new TimeoutException("\"" + errorMessage + "\" > " + timeout.getMessage());
+        }
     }
 
     /**
@@ -67,36 +83,17 @@ public class Waiter {
                                 By.cssSelector("#card-block"), expectedText),
                         "Post text '" + expectedText + "' not yet in timeline");
                 return;
-            } catch (org.openqa.selenium.TimeoutException e) {
+            } catch (TimeoutException e) {
                 if (attempt < maxRetries) {
                     log.debug("Post not found (attempt {}), refreshing...", attempt);
                     driver.navigate().refresh();
                     waitForMainPage();
                 } else {
-                    throw new org.openqa.selenium.TimeoutException(
+                    throw new TimeoutException(
                             "Post '" + expectedText + "' not found after " + maxRetries + " retries: "
                                     + e.getMessage());
                 }
             }
         }
-    }
-
-    public void waitUntil(ExpectedCondition<?> condition, String errorMessage) {
-        try {
-            this.genericWaiter.until(condition);
-        } catch (org.openqa.selenium.TimeoutException timeout) {
-            log.error(errorMessage);
-            throw new org.openqa.selenium.TimeoutException(
-                    "\"" + errorMessage + "\" > " + timeout.getMessage());
-        }
-    }
-
-    /**
-     * Main feed page (main.html) — navbar brand link.
-     */
-    public void waitForMainPage() {
-        log.debug("Waiting for main page to load");
-        navWaitUntil(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("a.navbar-brand")),
-                "Main page did not load");
     }
 }

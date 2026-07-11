@@ -61,6 +61,37 @@ class TestApiUsers extends BaseApiClass {
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
+    @DisplayName("TestAPIRegisterDuplicateUsername")
+    void testAPIRegisterDuplicateUsername() throws IOException {
+        long ts = unique();
+        String username = "dup" + ts;
+
+        int first = registerUser("Dave", "Dup", username, "pwd" + ts);
+        // user-service rejects an already-existing username with a ServiceException,
+        // which register.lua surfaces as HTTP 500.
+        int second = registerUser("Dave", "Dup", username, "pwd" + ts);
+        Assertions.assertAll(
+                () -> Assertions.assertEquals(200, first, "First registration must succeed"),
+                () -> Assertions.assertEquals(500, second,
+                        "Registering an already-existing username must return HTTP 500")
+        );
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @Test
+    @DisplayName("TestAPILoginWrongPasswordStatus")
+    void testAPILoginWrongPasswordStatus() throws IOException {
+        long ts = unique();
+        String username = "wrongst" + ts;
+        registerUser("Eve", "Status", username, "pwd" + ts);
+
+        // login.lua surfaces the user-service authentication failure as HTTP 500.
+        int status = postFormStatus(userUrl("/login"), loginPayload(username, "definitely-wrong"));
+        Assertions.assertEquals(500, status, "Login with a wrong password must return HTTP 500");
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @Test
     @DisplayName("TestLoginWrongPassword")
     void testLoginWrongPassword() throws IOException {
         long ts = unique();

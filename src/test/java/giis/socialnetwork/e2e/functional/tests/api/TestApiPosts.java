@@ -50,7 +50,7 @@ class TestApiPosts extends BaseApiClass {
 
         composePost(username, userId, postText);
 
-        String url = wrk2UserTimelineUrl(READPATH) + "?user_id=" + userId + "&start=0&stop=10";
+        String url = timelineReadUrl(wrk2UserTimelineUrl(READPATH), userId, 0, 10);
         JsonArray timeline = getJsonArray(url);
         Assertions.assertFalse(timeline.isEmpty(), "User timeline must contain at least one post after composing");
 
@@ -81,7 +81,7 @@ class TestApiPosts extends BaseApiClass {
 
         composePost(authorName, authorId, "hi @" + mentionedName + " " + unique());
 
-        String url = wrk2UserTimelineUrl(READPATH) + "?user_id=" + authorId + "&start=0&stop=10";
+        String url = timelineReadUrl(wrk2UserTimelineUrl(READPATH), authorId, 0, 10);
         JsonArray timeline = getJsonArray(url);
         Assertions.assertFalse(timeline.isEmpty(), "Author timeline must contain the composed post");
 

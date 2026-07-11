@@ -1,6 +1,5 @@
 package giis.socialnetwork.e2e.functional.pages;
 
-import giis.socialnetwork.e2e.functional.common.ElementNotFoundException;
 import giis.socialnetwork.e2e.functional.utils.Waiter;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -31,22 +30,24 @@ public class ContactPage extends BasePage {
     public boolean isFolloweeListDisplayed() {return isPresent(FOLLOWEE_LIST);}
 
     /**
-     * Submits the follow form. Both follow.lua and unfollow.lua redirect to contact.html, so the
-     * submit click drives the navigation itself — we only wait for the contact page to settle.
-     * Adding an explicit re-navigation here would race (and cancel) the in-flight POST under load.
+     * Submits a follow/unfollow form. Both follow.lua and unfollow.lua redirect to contact.html,
+     * so the submit click drives the navigation itself — we only wait for the contact page to
+     * settle. Adding an explicit re-navigation here would race (and cancel) the in-flight POST
+     * under load.
      */
-    public ContactPage followUser(String username) throws ElementNotFoundException {
-        fill(FOLLOW_INPUT, username);
-        click(FOLLOW_SUBMIT);
+    private ContactPage submitFollowForm(By input, By submit, String username) {
+        fill(input, username);
+        click(submit);
         waiter.waitForContactPage();
         return this;
     }
 
-    public ContactPage unfollowUser(String username) throws ElementNotFoundException {
-        fill(UNFOLLOW_INPUT, username);
-        click(UNFOLLOW_SUBMIT);
-        waiter.waitForContactPage();
-        return this;
+    public ContactPage followUser(String username) {
+        return submitFollowForm(FOLLOW_INPUT, FOLLOW_SUBMIT, username);
+    }
+
+    public ContactPage unfollowUser(String username) {
+        return submitFollowForm(UNFOLLOW_INPUT, UNFOLLOW_SUBMIT, username);
     }
 
     /*** Waits (with the longer navigation timeout) for the asynchronous get-followee XHR to render.*/

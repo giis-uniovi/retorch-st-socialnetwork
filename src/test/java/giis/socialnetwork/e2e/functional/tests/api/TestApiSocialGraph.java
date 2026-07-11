@@ -73,6 +73,17 @@ class TestApiSocialGraph extends BaseApiClass {
                 "User B (id=" + userBId + ") must appear in A's followee list");
     }
 
+    @AccessMode(resID = "social-graph", concurrency = 10, sharing = true, accessMode = "READONLY")
+    @Test
+    @DisplayName("TestAPIGetFollowersWithoutSessionUnauthorized")
+    void testAPIGetFollowersWithoutSessionUnauthorized() throws IOException {
+        // get_follower requires the login_token JWT cookie; without a session it must be rejected.
+        cookieStore.clear();
+        int status = getStatus(userUrl("/get_follower"));
+        Assertions.assertEquals(401, status,
+                "get_follower without a login_token cookie must return HTTP 401");
+    }
+
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
