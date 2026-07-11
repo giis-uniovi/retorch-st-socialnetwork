@@ -1,6 +1,5 @@
 package giis.socialnetwork.e2e.functional.pages;
 
-import giis.socialnetwork.e2e.functional.common.ElementNotFoundException;
 import giis.socialnetwork.e2e.functional.utils.Waiter;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -24,9 +23,14 @@ public class MainPage extends BasePage {
         return this;
     }
 
-    public MainPage composePost(String postText) throws ElementNotFoundException {
+    /** Opens the compose panel and waits until the post textarea is visible. */
+    private void showComposeForm() {
         click(SHOW_POST);
         waiter.waitUntil(ExpectedConditions.visibilityOfElementLocated(POST_CONTENT), "Post textarea not visible");
+    }
+
+    public MainPage composePost(String postText) {
+        showComposeForm();
         fill(POST_CONTENT, postText);
         click(CREATE_POST);
         return this;
@@ -50,9 +54,8 @@ public class MainPage extends BasePage {
     }
 
 
-    public boolean isComposeFormVisible() throws ElementNotFoundException {
-        click(SHOW_POST);
-        waiter.waitUntil(ExpectedConditions.visibilityOfElementLocated(POST_CONTENT), "Post textarea not visible");
+    public boolean isComposeFormVisible() {
+        showComposeForm();
         return isDisplayed(POST_CONTENT) && isDisplayed(CREATE_POST);
     }
 

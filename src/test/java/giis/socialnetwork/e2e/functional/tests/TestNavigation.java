@@ -2,7 +2,6 @@ package giis.socialnetwork.e2e.functional.tests;
 
 import giis.retorch.annotations.AccessMode;
 import giis.socialnetwork.e2e.functional.common.BaseLoggedClass;
-import giis.socialnetwork.e2e.functional.common.ElementNotFoundException;
 import giis.socialnetwork.e2e.functional.pages.ContactPage;
 import giis.socialnetwork.e2e.functional.pages.LoginPage;
 import giis.socialnetwork.e2e.functional.pages.MainPage;
@@ -18,10 +17,8 @@ class TestNavigation extends BaseLoggedClass {
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("testNavigation")
-    void testNavigation() throws ElementNotFoundException {
-        long ts = System.currentTimeMillis();
-        String username = "e2eUser" + ts;
-        String password = "pwd" + ts;
+    void testNavigation() {
+        TestUser user = newUser("e2eUser");
 
         // 1. Verify Login Page Structure
         LoginPage loginPage = new LoginPage(driver, waiter, sutUrl).open();
@@ -43,8 +40,8 @@ class TestNavigation extends BaseLoggedClass {
 
         // 3. Register, Login, and Verify Main Page Navbar
         MainPage mainPage = signupPage
-                .register("EndToEnd", "User", username, password)
-                .login(username, password);
+                .register("EndToEnd", "User", user.username, user.password)
+                .login(user.username, user.password);
 
         Assertions.assertAll("Main Page Navbar Checks",
                 () -> Assertions.assertTrue(mainPage.hasNavLink("Post"), "Navbar must contain a 'Post' link"),

@@ -1,6 +1,5 @@
 package giis.socialnetwork.e2e.functional.pages;
 
-import giis.socialnetwork.e2e.functional.common.ElementNotFoundException;
 import giis.socialnetwork.e2e.functional.utils.Waiter;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -22,7 +21,7 @@ public class LoginPage extends BasePage {
         return this;
     }
 
-    public MainPage login(String username, String password) throws ElementNotFoundException {
+    public MainPage login(String username, String password) {
         waiter.waitForLoginPage();
         fill(USERNAME, username);
         fill(PASSWORD, password);

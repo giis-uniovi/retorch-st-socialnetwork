@@ -5,6 +5,9 @@ import giis.selema.manager.SeleManager;
 import giis.selema.manager.SelemaConfig;
 import giis.selema.services.browser.DynamicGridBrowserService;
 import giis.selema.services.impl.WatermarkService;
+import giis.socialnetwork.e2e.functional.pages.LoginPage;
+import giis.socialnetwork.e2e.functional.pages.MainPage;
+import giis.socialnetwork.e2e.functional.pages.SignupPage;
 import giis.socialnetwork.e2e.functional.utils.Waiter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -16,9 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.Properties;
 
 @ExtendWith(LifecycleJunit5.class)
 public class BaseLoggedClass {
@@ -31,20 +31,13 @@ public class BaseLoggedClass {
             .setName(System.getProperty("TJOB_NAME") == null ? "locallogs" : System.getProperty("TJOB_NAME")));
 
     protected static String sutUrl;
-    protected static String tJobName = "DEFAULT_TJOB";
     protected WebDriver driver;
     protected Waiter waiter;
 
     @BeforeAll
     static void setupAll() throws IOException {
         log.info("Starting global browser setup");
-        Properties properties = new Properties();
-        properties.load(Files.newInputStream(Paths.get("src/test/resources/test.properties")));
-        tJobName = System.getProperty("TJOB_NAME");
-        String envUrl = System.getProperty("SUT_URL") != null
-                ? System.getProperty("SUT_URL")
-                : System.getenv("SUT_URL");
-        sutUrl = envUrl != null ? envUrl : properties.getProperty("LOCALHOST_URL");
+        sutUrl = SutConfig.resolveSutUrl();
         setupBrowser();
         log.info("Global browser setup complete. SUT: {}", sutUrl);
     }
@@ -72,5 +65,35 @@ public class BaseLoggedClass {
     void tearDown(TestInfo testInfo) {
         log.info("Tearing down test: {}", testInfo.getDisplayName());
         driver.get(sutUrl + "/index.html");
+    }
+
+    // ── UI user fixture ───────────────────────────────────────────────────────
+
+    /** Immutable credentials for a UI test user, unique per {@link #newUser(String)} call. */
+    public static final class TestUser {
+        public final String username;
+        public final String password;
+
+        TestUser(String username, String password) {
+            this.username = username;
+            this.password = password;
+        }
+    }
+
+    /** Creates unique credentials derived from {@code label} and the current timestamp. */
+    protected TestUser newUser(String label) {
+        long ts = System.currentTimeMillis();
+        return new TestUser(label + ts, "pwd" + ts);
+    }
+
+    /** Registers {@code user} through the signup page, landing on the login page. */
+    protected LoginPage registerUser(TestUser user) {
+        return new SignupPage(driver, waiter, sutUrl).open()
+                .register("E2E", "User", user.username, user.password);
+    }
+
+    /** Registers {@code user} and logs in, landing on the main feed page. */
+    protected MainPage registerAndLogin(TestUser user) {
+        return registerUser(user).login(user.username, user.password);
     }
 }

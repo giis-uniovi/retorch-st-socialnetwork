@@ -2,10 +2,8 @@ package giis.socialnetwork.e2e.functional.common;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -26,12 +24,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
-import java.util.Properties;
 
 /**
  * Base class for Social Network API test suite. Provides HTTP infrastructure for
@@ -45,18 +40,11 @@ public class BaseApiClass {
     protected static CloseableHttpClient httpClient;
     protected static BasicCookieStore cookieStore;
     protected static String sutUrl;
-    protected static String tJobName;
 
     @BeforeAll
     static void setupAll() throws IOException {
         log.info("Starting API test global setup");
-        Properties properties = new Properties();
-        properties.load(Files.newInputStream(Paths.get("src/test/resources/test.properties")));
-        tJobName = System.getProperty("TJOB_NAME");
-        String envUrl = System.getProperty("SUT_URL") != null
-                ? System.getProperty("SUT_URL")
-                : System.getenv("SUT_URL");
-        sutUrl = envUrl != null ? envUrl : properties.getProperty("LOCALHOST_URL");
+        sutUrl = SutConfig.resolveSutUrl();
         log.info("API base URL: {}", sutUrl);
         cookieStore = new BasicCookieStore();
         httpClient = HttpClients.custom()
@@ -73,20 +61,68 @@ public class BaseApiClass {
         }
     }
 
+    // ── HTTP primitives ───────────────────────────────────────────────────────
+
+    /** Executes the request, discards the body, and returns the HTTP status code. */
+    private static int executeForStatus(HttpUriRequest request) throws IOException {
+        try (CloseableHttpResponse response = httpClient.execute(request)) {
+            EntityUtils.consume(response.getEntity());
+            int status = response.getStatusLine().getStatusCode();
+            log.debug("{} {} -> {}", request.getMethod(), request.getURI(), status);
+            return status;
+        }
+    }
+
+    /** Executes the request and returns the response body (empty string if none). */
+    private static String executeForBody(HttpUriRequest request) throws IOException {
+        try (CloseableHttpResponse response = httpClient.execute(request)) {
+            HttpEntity entity = response.getEntity();
+            String body = entity != null ? EntityUtils.toString(entity) : "";
+            log.debug("{} {} -> {} ({} chars)", request.getMethod(), request.getURI(),
+                    response.getStatusLine().getStatusCode(), body.length());
+            return body;
+        }
+    }
+
+    private static HttpPost buildFormPost(String url, List<NameValuePair> params) {
+        HttpPost request = new HttpPost(url);
+        request.setEntity(new UrlEncodedFormEntity(params, StandardCharsets.UTF_8));
+        return request;
+    }
+
+    protected int getStatus(String url) throws IOException {
+        return executeForStatus(new HttpGet(url));
+    }
+
+    protected String get(String url) throws IOException {
+        HttpGet request = new HttpGet(url);
+        request.addHeader("Accept", "application/json");
+        return executeForBody(request);
+    }
+
+    protected int postFormStatus(String url, List<NameValuePair> params) throws IOException {
+        return executeForStatus(buildFormPost(url, params));
+    }
+
+    protected String postForm(String url, List<NameValuePair> params) throws IOException {
+        return executeForBody(buildFormPost(url, params));
+    }
+
+    /** Parses the GET response as a JSON array, tolerating non-array bodies (e.g. an
+     *  empty home timeline serialises as {@code {}}) by returning an empty array. */
+    protected JsonArray getJsonArray(String url) throws IOException {
+        JsonElement element = JsonParser.parseString(get(url));
+        return element.isJsonArray() ? element.getAsJsonArray() : new JsonArray();
+    }
+
     // ── URL builders ──────────────────────────────────────────────────────────
 
-    /**
-     * Returns {@code true} if any element of {@code array} is an object whose
-     * {@code fieldName} property equals {@code expected}.
-     */
-    protected static boolean containsByField(JsonArray array, String fieldName, String expected) {
-        for (JsonElement element : array) {
-            if (element.isJsonObject()
-                    && expected.equals(element.getAsJsonObject().get(fieldName).getAsString())) {
-                return true;
-            }
-        }
-        return false;
+    protected String userUrl(String path) {
+        return sutUrl + "/api/user" + path;
+    }
+
+    protected String wrk2PostUrl(String path) {
+        return sutUrl + "/wrk2-api/post" + path;
     }
 
     protected String wrk2UserTimelineUrl(String path) {
@@ -97,46 +133,50 @@ public class BaseApiClass {
         return sutUrl + "/wrk2-api/home-timeline" + path;
     }
 
-    protected int getStatus(String url) throws IOException {
-        return statusOf(new HttpGet(url));
+    /** Builds a timeline read URL ({@code base} is a user- or home-timeline read endpoint). */
+    protected String timelineReadUrl(String base, long userId, int start, int stop) {
+        return base + "?user_id=" + userId + "&start=" + start + "&stop=" + stop;
     }
 
-    // ── HTTP primitives ───────────────────────────────────────────────────────
+    // ── Payload builders (form params) ────────────────────────────────────────
 
-    private int statusOf(HttpUriRequest request) throws IOException {
-        try (CloseableHttpResponse response = httpClient.execute(request)) {
-            EntityUtils.consume(response.getEntity());
-            int status = response.getStatusLine().getStatusCode();
-            log.debug("{} {} -> {}", request.getMethod(), request.getURI(), status);
-            return status;
-        }
+    protected static List<NameValuePair> registerPayload(String firstName, String lastName,
+                                                         String username, String password) {
+        return Arrays.asList(
+                new BasicNameValuePair("first_name", firstName),
+                new BasicNameValuePair("last_name", lastName),
+                new BasicNameValuePair("username", username),
+                new BasicNameValuePair("password", password)
+        );
     }
 
-    protected JsonObject getJsonObject(String url) throws IOException {
-        return JsonParser.parseString(get(url)).getAsJsonObject();
+    protected static List<NameValuePair> loginPayload(String username, String password) {
+        return Arrays.asList(
+                new BasicNameValuePair("username", username),
+                new BasicNameValuePair("password", password)
+        );
     }
 
-    protected String get(String url) throws IOException {
-        HttpGet request = new HttpGet(url);
-        request.addHeader("Accept", "application/json");
-        HttpResponse response = httpClient.execute(request);
-        HttpEntity entity = response.getEntity();
-        String body = entity != null ? EntityUtils.toString(entity) : "";
-        log.debug("GET {} -> {} ({} chars)", url, response.getStatusLine().getStatusCode(), body.length());
-        return body;
+    /** Shared by follow and unfollow — both endpoints take the same form fields. */
+    protected static List<NameValuePair> followFormPayload(String userName, String followeeName) {
+        return Arrays.asList(
+                new BasicNameValuePair("user_name", userName),
+                new BasicNameValuePair("followee_name", followeeName)
+        );
     }
 
-    /**
-     * Convenience fixture: derives username/password from {@code label + unique()},
-     * registers the user, logs in, and returns the assigned {@code user_id}.
-     */
-    protected long createUser(String label) throws IOException {
-        long ts = unique();
-        String username = (label + ts).toLowerCase().replaceAll("[^a-z0-9]", "");
-        String password = "pwd" + ts;
-        registerUser(label, label + "Ln", username, password);
-        return loginUser(username, password);
+    protected static List<NameValuePair> composePostPayload(String username, long userId, String text) {
+        return Arrays.asList(
+                new BasicNameValuePair("username", username),
+                new BasicNameValuePair("user_id", String.valueOf(userId)),
+                new BasicNameValuePair("text", text),
+                new BasicNameValuePair("media_ids", "[]"),
+                new BasicNameValuePair("media_types", "[]"),
+                new BasicNameValuePair("post_type", "0")
+        );
     }
+
+    // ── Fixture helpers ───────────────────────────────────────────────────────
 
     protected static long unique() {
         return System.currentTimeMillis();
@@ -155,80 +195,48 @@ public class BaseApiClass {
     }
 
     /**
+     * Clears the cookie store, posts the login form, and returns the
+     * {@code login_token} cookie issued by the server, or {@code null} when
+     * authentication failed and no token was set.
+     */
+    private static Cookie loginAndGetToken(String username, String password) throws IOException {
+        cookieStore.clear();
+        executeForBody(buildFormPost(sutUrl + "/api/user/login", loginPayload(username, password)));
+        for (Cookie cookie : cookieStore.getCookies()) {
+            if ("login_token".equals(cookie.getName())) {
+                return cookie;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Logs in as the given user via {@code POST /api/user/login}. Stores the
      * {@code login_token} JWT cookie in the shared cookie store. Returns the
      * numeric {@code user_id} extracted from the JWT payload.
      */
     protected long loginUser(String username, String password) throws IOException {
-        cookieStore.clear();
-        postForm(userUrl("/login"), loginPayload(username, password));
-        for (Cookie cookie : cookieStore.getCookies()) {
-            if ("login_token".equals(cookie.getName())) {
-                long userId = parseUserIdFromJwt(cookie.getValue());
-                log.debug("Logged in as '{}', user_id={}", username, userId);
-                return userId;
-            }
+        Cookie token = loginAndGetToken(username, password);
+        if (token == null) {
+            throw new IllegalStateException("No login_token cookie after login for user: " + username);
         }
-        throw new IllegalStateException("No login_token cookie after login for user: " + username);
-    }
-
-    protected int postFormStatus(String url, List<NameValuePair> params) throws IOException {
-        return statusOf(buildFormPost(url, params));
-    }
-
-    protected String userUrl(String path) {
-        return sutUrl + "/api/user" + path;
-    }
-
-    protected static List<NameValuePair> registerPayload(String firstName, String lastName,
-                                                         String username, String password) {
-        return Arrays.asList(
-                new BasicNameValuePair("first_name", firstName),
-                new BasicNameValuePair("last_name", lastName),
-                new BasicNameValuePair("username", username),
-                new BasicNameValuePair("password", password)
-        );
-    }
-
-    // ── Payload builders (form params) ────────────────────────────────────────
-
-    protected String postForm(String url, List<NameValuePair> params) throws IOException {
-        HttpPost request = buildFormPost(url, params);
-        HttpResponse response = httpClient.execute(request);
-        HttpEntity entity = response.getEntity();
-        String body = entity != null ? EntityUtils.toString(entity) : "";
-        log.debug("POST {} -> {} ({} chars)", url, response.getStatusLine().getStatusCode(), body.length());
-        return body;
-    }
-
-    protected static List<NameValuePair> loginPayload(String username, String password) {
-        return Arrays.asList(
-                new BasicNameValuePair("username", username),
-                new BasicNameValuePair("password", password)
-        );
+        long userId = parseUserIdFromJwt(token.getValue());
+        log.debug("Logged in as '{}', user_id={}", username, userId);
+        return userId;
     }
 
     /**
-     * Decodes the {@code user_id} field from a JWT token payload without verifying
-     * the signature — safe for test fixtures where the secret is known.
+     * Attempts a login and reports whether the server issued a {@code login_token}
+     * cookie, without throwing when it did not. Used to assert authentication failures.
      */
-    private static long parseUserIdFromJwt(String jwt) {
-        String payload = jwt.split("\\.")[1];
-        int padding = (4 - payload.length() % 4) % 4;
-        payload = payload + "===".substring(0, padding);
-        String json = new String(Base64.getUrlDecoder().decode(payload), StandardCharsets.UTF_8);
-        return JsonParser.parseString(json).getAsJsonObject().get("user_id").getAsLong();
-    }
-
-    private static HttpPost buildFormPost(String url, List<NameValuePair> params) {
-        HttpPost request = new HttpPost(url);
-        request.setEntity(new UrlEncodedFormEntity(params, StandardCharsets.UTF_8));
-        return request;
+    protected boolean loginSetsToken(String username, String password) throws IOException {
+        return loginAndGetToken(username, password) != null;
     }
 
     /**
-     * Same as {@link #createUser(String)} but also returns the generated username
-     * so the caller can reference it in social-graph operations.
+     * Convenience fixture: derives a unique username/password from {@code label},
+     * registers the user and logs in. Returns {@code {username, userId, password}}
+     * so the caller can reference them in social-graph operations.
      */
     protected String[] createUserWithName(String label) throws IOException {
         long ts = unique();
@@ -238,8 +246,6 @@ public class BaseApiClass {
         long userId = loginUser(username, password);
         return new String[]{username, String.valueOf(userId), password};
     }
-
-    // ── Fixture helpers ───────────────────────────────────────────────────────
 
     /**
      * Composes a post via {@code POST /wrk2-api/post/compose}. Returns HTTP 200
@@ -252,37 +258,15 @@ public class BaseApiClass {
         return status;
     }
 
-    protected String wrk2PostUrl(String path) {
-        return sutUrl + "/wrk2-api/post" + path;
-    }
-
-    protected static List<NameValuePair> composePostPayload(String username, long userId, String text) {
-        return Arrays.asList(
-                new BasicNameValuePair("username", username),
-                new BasicNameValuePair("user_id", String.valueOf(userId)),
-                new BasicNameValuePair("text", text),
-                new BasicNameValuePair("media_ids", "[]"),
-                new BasicNameValuePair("media_types", "[]"),
-                new BasicNameValuePair("post_type", "0")
-        );
-    }
-
     /**
      * Follows {@code followeeName} as {@code userName} via
      * {@code POST /api/user/follow}. No authentication required.
      * Returns HTTP 200 on success (server redirects to contact.html).
      */
     protected int followUser(String userName, String followeeName) throws IOException {
-        int status = postFormStatus(userUrl("/follow"), followPayload(userName, followeeName));
+        int status = postFormStatus(userUrl("/follow"), followFormPayload(userName, followeeName));
         log.debug("'{}' follows '{}': HTTP {}", userName, followeeName, status);
         return status;
-    }
-
-    protected static List<NameValuePair> followPayload(String userName, String followeeName) {
-        return Arrays.asList(
-                new BasicNameValuePair("user_name", userName),
-                new BasicNameValuePair("followee_name", followeeName)
-        );
     }
 
     /**
@@ -291,16 +275,9 @@ public class BaseApiClass {
      * Returns HTTP 200 on success.
      */
     protected int unfollowUser(String userName, String followeeName) throws IOException {
-        int status = postFormStatus(userUrl("/unfollow"), unfollowPayload(userName, followeeName));
+        int status = postFormStatus(userUrl("/unfollow"), followFormPayload(userName, followeeName));
         log.debug("'{}' unfollows '{}': HTTP {}", userName, followeeName, status);
         return status;
-    }
-
-    protected static List<NameValuePair> unfollowPayload(String userName, String followeeName) {
-        return Arrays.asList(
-                new BasicNameValuePair("user_name", userName),
-                new BasicNameValuePair("followee_name", followeeName)
-        );
     }
 
     /**
@@ -311,11 +288,6 @@ public class BaseApiClass {
         return getJsonArray(userUrl("/get_follower"));
     }
 
-    protected JsonArray getJsonArray(String url) throws IOException {
-        JsonElement element = JsonParser.parseString(get(url));
-        return element.isJsonArray() ? element.getAsJsonArray() : new JsonArray();
-    }
-
     /**
      * Reads the followee id list of the currently logged-in user via
      * {@code GET /api/user/get_followee} (requires a valid {@code login_token} cookie).
@@ -324,18 +296,31 @@ public class BaseApiClass {
         return getJsonArray(userUrl("/get_followee"));
     }
 
+    // ── Assertion helpers ─────────────────────────────────────────────────────
+
     /**
-     * Attempts a login and reports whether the server issued a {@code login_token}
-     * cookie, without throwing when it did not. Used to assert authentication failures.
+     * Returns {@code true} if any element of {@code array} is an object whose
+     * {@code fieldName} property equals {@code expected}.
      */
-    protected boolean loginSetsToken(String username, String password) throws IOException {
-        cookieStore.clear();
-        postForm(userUrl("/login"), loginPayload(username, password));
-        for (Cookie cookie : cookieStore.getCookies()) {
-            if ("login_token".equals(cookie.getName())) {
+    protected static boolean containsByField(JsonArray array, String fieldName, String expected) {
+        for (JsonElement element : array) {
+            if (element.isJsonObject()
+                    && expected.equals(element.getAsJsonObject().get(fieldName).getAsString())) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Decodes the {@code user_id} field from a JWT token payload without verifying
+     * the signature — safe for test fixtures where the secret is known.
+     */
+    private static long parseUserIdFromJwt(String jwt) {
+        String payload = jwt.split("\\.")[1];
+        int padding = (4 - payload.length() % 4) % 4;
+        payload = payload + "===".substring(0, padding);
+        String json = new String(Base64.getUrlDecoder().decode(payload), StandardCharsets.UTF_8);
+        return JsonParser.parseString(json).getAsJsonObject().get("user_id").getAsLong();
     }
 }

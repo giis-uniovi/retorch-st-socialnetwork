@@ -33,7 +33,7 @@ class TestApiTimeline extends BaseApiClass {
         String[] reader = createUserWithName("htreader");
         long readerId = Long.parseLong(reader[1]);
 
-        String url = wrk2HomeTimelineUrl(READPATH) + "?user_id=" + readerId + "&start=0&stop=10";
+        String url = timelineReadUrl(wrk2HomeTimelineUrl(READPATH), readerId, 0, 10);
         JsonArray timeline = getJsonArray(url);
         // A new user has an empty home timeline — the array must still be valid JSON
         Assertions.assertNotNull(timeline, "Home timeline response must be a valid JSON array");
@@ -78,7 +78,7 @@ class TestApiTimeline extends BaseApiClass {
      * Uses {@link LockSupport#parkNanos} to avoid Sonar rule {@code java:S2925}.
      */
     private JsonArray pollHomeTimeline(long userId, String expectedText) throws IOException {
-        String url = wrk2HomeTimelineUrl(READPATH) + "?user_id=" + userId + "&start=0&stop=10";
+        String url = timelineReadUrl(wrk2HomeTimelineUrl(READPATH), userId, 0, 10);
         long deadline = System.currentTimeMillis() + HOME_TIMELINE_TIMEOUT_MS;
         JsonArray timeline;
         do {
@@ -90,6 +90,37 @@ class TestApiTimeline extends BaseApiClass {
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(HOME_TIMELINE_POLL_MS));
         } while (!Thread.currentThread().isInterrupted());
         return timeline;
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "home-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
+    @Test
+    @DisplayName("TestAPIHomeTimelineExcludesOwnPosts")
+    void testAPIHomeTimelineExcludesOwnPosts() throws IOException {
+        String[] author = createUserWithName("ownauthor");
+        String authorName = author[0];
+        long authorId = Long.parseLong(author[1]);
+        String[] follower = createUserWithName("ownfollower");
+        long followerId = Long.parseLong(follower[1]);
+
+        // The author needs ≥1 follower before composing (empty-ZADD returns HTTP 500)
+        followUser(follower[0], authorName);
+
+        String uniqueText = "OwnPost" + unique();
+        composePost(authorName, authorId, uniqueText);
+
+        // Wait until the async fan-out delivered the post to the follower's home timeline...
+        JsonArray followerTimeline = pollHomeTimeline(followerId, uniqueText);
+        Assertions.assertTrue(containsByField(followerTimeline, "text", uniqueText),
+                "Post must reach the follower's home timeline within " + HOME_TIMELINE_TIMEOUT_MS + " ms");
+
+        // ...then verify the author's own home timeline never includes the author's own post
+        JsonArray authorTimeline = getJsonArray(
+                timelineReadUrl(wrk2HomeTimelineUrl(READPATH), authorId, 0, 10));
+        Assertions.assertFalse(containsByField(authorTimeline, "text", uniqueText),
+                "The home timeline must not include the reader's own posts");
     }
 
     @AccessMode(resID = "home-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")

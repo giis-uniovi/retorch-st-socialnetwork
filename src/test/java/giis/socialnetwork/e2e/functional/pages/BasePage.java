@@ -1,6 +1,5 @@
 package giis.socialnetwork.e2e.functional.pages;
 
-import giis.socialnetwork.e2e.functional.common.ElementNotFoundException;
 import giis.socialnetwork.e2e.functional.utils.Click;
 import giis.socialnetwork.e2e.functional.utils.Waiter;
 import org.openqa.selenium.By;
@@ -48,7 +47,7 @@ public abstract class BasePage {
     }
 
     /**Clicks once the element is clickable, falling back to a JS click if it is obscured.*/
-    protected void click(By locator) throws ElementNotFoundException {
+    protected void click(By locator) {
         waiter.waitUntil(ExpectedConditions.elementToBeClickable(locator), "Element not clickable: " + locator);
         Click.element(driver, driver.findElement(locator));
     }

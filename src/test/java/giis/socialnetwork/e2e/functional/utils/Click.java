@@ -17,8 +17,7 @@ public class Click {
      * Clicks {@code element} using the standard Selenium click; falls back to a
      * JavaScript click if the first attempt fails (e.g. element obscured by an overlay).
      */
-    public static void element(WebDriver driver, WebElement element)
-            throws ElementNotFoundException {
+    public static void element(WebDriver driver, WebElement element) {
         try {
             log.debug("Clicking element: {}", element);
             element.click();
