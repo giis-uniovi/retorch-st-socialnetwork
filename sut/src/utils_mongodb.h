@@ -1,0 +1,126 @@
+#include <format>
+#ifndef SOCIAL_NETWORK_MICROSERVICES_SRC_UTILS_MONGODB_H_
+#define SOCIAL_NETWORK_MICROSERVICES_SRC_UTILS_MONGODB_H_
+
+#include <mongoc.h>
+#include <bson/bson.h>
+
+#include "../gen-cpp/social_network_types.h"
+
+static constexpr int SERVER_SELECTION_TIMEOUT_MS = 300;
+
+namespace social_network {
+
+// ---------------------------------------------------------------------------
+// MongoDB pool / collection helpers shared by all handler files
+// ---------------------------------------------------------------------------
+
+// Pop a client from the pool; throw SE_MONGODB_ERROR if null.
+inline mongoc_client_t *PopMongoClient(mongoc_client_pool_t *pool) {
+  mongoc_client_t *client = mongoc_client_pool_pop(pool);
+  if (!client) {
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = "Failed to pop a client from MongoDB pool";
+    throw se;
+  }
+  return client;
+}
+
+// Get a collection from client; push client back and throw SE_MONGODB_ERROR if null.
+inline mongoc_collection_t *GetMongoCollection(
+    mongoc_client_pool_t *pool,
+    mongoc_client_t *client,
+    const char *db_name,
+    const char *collection_name) {
+  mongoc_collection_t *col =
+      mongoc_client_get_collection(client, db_name, collection_name);
+  if (!col) {
+    mongoc_client_pool_push(pool, client);
+    ServiceException se;
+    se.errorCode = ErrorCode::SE_MONGODB_ERROR;
+    se.message = std::format("Failed to create collection {} from DB {}",
+                             collection_name, db_name);
+    throw se;
+  }
+  return col;
+}
+
+mongoc_client_pool_t* init_mongodb_client_pool(
+    const json &config_json,
+    const std::string &service_name,
+    uint32_t max_size
+) {
+  std::string addr = config_json[service_name + "-mongodb"]["addr"];
+  int port = config_json[service_name + "-mongodb"]["port"];
+  std::string uri_str = std::format("mongodb://{}:{}/?appname={}-service",
+      addr, port, service_name);
+  uri_str += std::format("&{}={}", MONGOC_URI_SERVERSELECTIONTIMEOUTMS,
+      SERVER_SELECTION_TIMEOUT_MS);
+
+  mongoc_init();
+  bson_error_t error;
+  mongoc_uri_t *mongodb_uri =
+      mongoc_uri_new_with_error(uri_str.c_str(), &error);
+
+  if (!mongodb_uri) {
+    LOG(fatal) << "Error: failed to parse URI" << std::endl
+              << "error message: " << std::endl
+              << uri_str << std::endl
+              << error.message<< std::endl;
+    return nullptr;
+  } else {
+    if (config_json["ssl"]["enabled"]) {
+      std::string ca_file = config_json["ssl"]["caPath"];
+
+      mongoc_uri_set_option_as_bool(mongodb_uri, MONGOC_URI_TLS, true);
+      mongoc_uri_set_option_as_utf8(mongodb_uri, MONGOC_URI_TLSCAFILE, ca_file.c_str());
+      mongoc_uri_set_option_as_bool(mongodb_uri, MONGOC_URI_TLSALLOWINVALIDHOSTNAMES, true);
+    }
+
+    mongoc_client_pool_t *client_pool= mongoc_client_pool_new(mongodb_uri);
+    mongoc_client_pool_max_size(client_pool, max_size);
+    return client_pool;
+  }
+}
+
+bool CreateIndex(
+    mongoc_client_t *client,
+    const std::string &db_name,
+    const std::string &index,
+    bool unique) {
+  mongoc_database_t *db;
+  bson_t keys;
+  char *index_name;
+  bson_t *create_indexes;
+  bson_t reply;
+  bson_error_t error;
+  bool r;
+
+  db = mongoc_client_get_database(client, db_name.c_str());
+  bson_init (&keys);
+  BSON_APPEND_INT32(&keys, index.c_str(), 1);
+  index_name = mongoc_collection_keys_to_index_string(&keys);
+  create_indexes = BCON_NEW (
+      "createIndexes", BCON_UTF8(db_name.c_str()),
+      "indexes", "[", "{",
+          "key", BCON_DOCUMENT (&keys),
+          "name", BCON_UTF8 (index_name),
+          "unique", BCON_BOOL(unique),
+      "}", "]");
+  r = mongoc_database_write_command_with_opts (
+      db, create_indexes, NULL, &reply, &error);
+  if (!r) {
+    LOG(error) << "Error in createIndexes: " << error.message;
+  }
+  bson_free (index_name);
+  bson_destroy (&reply);
+  bson_destroy (create_indexes);
+  mongoc_database_destroy(db);
+
+  return r;
+}
+
+} // namespace social_network
+
+#endif //SOCIAL_NETWORK_MICROSERVICES_SRC_UTILS_MONGODB_H_
