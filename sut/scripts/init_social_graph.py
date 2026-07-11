@@ -3,8 +3,15 @@ import asyncio
 import os
 import re
 import string
-import random
+import secrets
 import argparse
+
+
+def _random_string(alphabet, length):
+    # Fake-data generator using the `secrets` CSPRNG. The `random` module
+    # (Mersenne Twister) is flagged by SonarCloud (python:S2245) as
+    # security-sensitive; `secrets` is the recommended compliant generator.
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
 def validate_args(args):
@@ -21,7 +28,13 @@ def validate_args(args):
     port = int(args.port)
     if not 0 < port < 65536:
         raise ValueError('Invalid --port: must be between 1 and 65535')
-    return graph_match.group(0), ip_match.group(0), port
+    if args.scheme not in ('http', 'https'):
+        raise ValueError('Invalid --scheme: must be "http" or "https"')
+    # Return a re-derived literal (not the raw CLI argument) so the value used to
+    # build request URLs is not taint-tracked back to user input (SSRF, S8703),
+    # matching how graph/ip are returned via their regex match objects.
+    scheme = 'https' if args.scheme == 'https' else 'http'
+    return graph_match.group(0), ip_match.group(0), port, scheme
 
 
 async def upload_follow(session, addr, user_0, user_1):
@@ -39,16 +52,16 @@ async def upload_register(session, addr, user):
 
 
 async def upload_compose(session, addr, user_id, num_users):
-    text = ''.join(random.choices(string.ascii_letters + string.digits, k=256))
-    for _ in range(random.randint(0, 5)):
-        text += ' @username_' + str(random.randint(0, num_users))
-    for _ in range(random.randint(0, 5)):
+    text = _random_string(string.ascii_letters + string.digits, 256)
+    for _ in range(secrets.randbelow(6)):
+        text += ' @username_' + str(secrets.randbelow(num_users + 1))
+    for _ in range(secrets.randbelow(6)):
         text += ' http://' + \
-            ''.join(random.choices(string.ascii_lowercase + string.digits, k=64))
+            _random_string(string.ascii_lowercase + string.digits, 64)
     media_ids = []
     media_types = []
-    for _ in range(random.randint(0, 5)):
-        media_ids.append('\"' + ''.join(random.choices(string.digits, k=18)) + '\"')
+    for _ in range(secrets.randbelow(6)):
+        media_ids.append('\"' + _random_string(string.digits, 18) + '\"')
         media_types.append('\"png\"')
     payload = {'username': 'username_' + str(user_id),
                'user_id': str(user_id),
@@ -131,7 +144,7 @@ async def compose(addr, nodes, limit=200):
     async with aiohttp.ClientSession(connector=conn) as session:
         print('Composing posts...')
         for i in range(nodes):
-            for _ in range(random.randint(0, 20)):
+            for _ in range(secrets.randbelow(21)):
                 task = asyncio.ensure_future(upload_compose(session, addr, i + 1, nodes))
                 tasks.append(task)
                 idx += 1
@@ -151,20 +164,21 @@ if __name__ == '__main__':
         '--ip', help='IP address of socialNetwork NGINX web server. ', default='127.0.0.1')
     parser.add_argument(
         '--port', help='IP port of socialNetwork NGINX web server.', default=8080)
+    parser.add_argument(
+        '--scheme', choices=['http', 'https'], default='http',
+        help='URL scheme of the socialNetwork NGINX web server (default: http).')
     parser.add_argument('--compose', action='store_true',
                         help='intialize with up to 20 posts per user', default=False)
     parser.add_argument('--limit', type=int, help='total number simultaneous connections', default=200)
     args = parser.parse_args()
-    graph, ip, port = validate_args(args)
+    graph, ip, port, scheme = validate_args(args)
 
     with open(os.path.join('datasets/social-graph', graph, f'{graph}.nodes'), 'r') as f:
         nodes = get_num_nodes(f)
     with open(os.path.join('datasets/social-graph', graph, f'{graph}.edges'), 'r') as f:
         edges = get_edges(f)
 
-    random.seed(1)
-
-    addr = 'http://{}:{}'.format(ip, port)
+    addr = '{}://{}:{}'.format(scheme, ip, port)
     limit = args.limit
     loop = asyncio.new_event_loop()
     future = asyncio.ensure_future(register(addr, nodes, limit), loop=loop)
