@@ -68,7 +68,7 @@ pipeline {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobe 0 http://tjobe-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobe 0 http://tjobe-nginx-thrift:8080 "TestPosts#testComposePostAppearsInTimeline"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobe 0 http://tjobe-nginx-thrift:8080 "TestPosts#testComposePostAppearsInTimeline,TestPosts#testComposePostWithMentionShowsProfileLink"'
             }// EndExecutionStageErrortjobe
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobe 0'
           }// EndStepstjobe
@@ -96,29 +96,29 @@ pipeline {
     stage('Stage 1') {
       failFast false
       parallel {
-        stage('tjobh IdResource: post user user-timeline ') {
+        stage('tjobh IdResource: post social-graph user user-timeline ') {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobh 1 http://tjobh-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobh 1 http://tjobh-nginx-thrift:8080 "TestApiPosts#testAPIComposePostWithMentionPopulatesUserMentions,TestApiPosts#testAPIReadUserTimeline"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobh 1 http://tjobh-nginx-thrift:8080 "TestApiPosts#testAPIComposePostShortensUrls,TestApiPosts#testAPIComposePostWithMediaAttachesMedia,TestApiPosts#testAPIUserTimelinePagination"'
             }// EndExecutionStageErrortjobh
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobh 1'
           }// EndStepstjobh
         }// EndStagetjobh
-        stage('tjobi IdResource: post social-graph user ') {
+        stage('tjobi IdResource: post user user-timeline ') {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobi 1 http://tjobi-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobi 1 http://tjobi-nginx-thrift:8080 "TestApiPosts#testAPIComposePost"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobi 1 http://tjobi-nginx-thrift:8080 "TestApiPosts#testAPIComposePostWithMentionPopulatesUserMentions,TestApiPosts#testAPIReadUserTimeline"'
             }// EndExecutionStageErrortjobi
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobi 1'
           }// EndStepstjobi
         }// EndStagetjobi
-        stage('tjobj IdResource: social-graph user ') {
+        stage('tjobj IdResource: post social-graph user ') {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobj 1 http://tjobj-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobj 1 http://tjobj-nginx-thrift:8080 "TestApiSocialGraph#testAPIFollowUser,TestApiSocialGraph#testAPIGetFolloweesWithToken,TestApiSocialGraph#testAPIGetFollowers,TestApiSocialGraph#testAPIUnfollowRemovesFollowee"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobj 1 http://tjobj-nginx-thrift:8080 "TestApiPosts#testAPIComposePost"'
             }// EndExecutionStageErrortjobj
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobj 1'
           }// EndStepstjobj
@@ -137,11 +137,11 @@ pipeline {
     stage('Stage 2') {
       failFast false
       parallel {
-        stage('tjobl IdResource: user ') {
+        stage('tjobl IdResource: social-graph user ') {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobl 2 http://tjobl-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobl 2 http://tjobl-nginx-thrift:8080 "TestApiUsers#testAPILoginUser,TestApiUsers#testAPILoginWrongPasswordStatus,TestApiUsers#testAPIRegisterDuplicateUsername,TestApiUsers#testAPIRegisterUser,TestApiUsers#testLoginWrongPassword"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobl 2 http://tjobl-nginx-thrift:8080 "TestApiSocialGraph#testAPIFollowUser,TestApiSocialGraph#testAPIGetFolloweesWithToken,TestApiSocialGraph#testAPIGetFollowers,TestApiSocialGraph#testAPIUnfollowNotFollowedIsIdempotent,TestApiSocialGraph#testAPIUnfollowRemovesFollowee"'
             }// EndExecutionStageErrortjobl
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobl 2'
           }// EndStepstjobl
@@ -150,11 +150,20 @@ pipeline {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobm 2 http://tjobm-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobm 2 http://tjobm-nginx-thrift:8080 "TestApiUsers#testAPIRegisterMissingField"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobm 2 http://tjobm-nginx-thrift:8080 "TestApiUsers#testAPILoginUser,TestApiUsers#testAPILoginWrongPasswordStatus,TestApiUsers#testAPIRegisterDuplicateUsername,TestApiUsers#testAPIRegisterUser,TestApiUsers#testLoginWrongPassword"'
             }// EndExecutionStageErrortjobm
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobm 2'
           }// EndStepstjobm
         }// EndStagetjobm
+        stage('tjobn IdResource: user ') {
+          steps {
+            catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobn 2 http://tjobn-nginx-thrift:8080'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobn 2 http://tjobn-nginx-thrift:8080 "TestApiUsers#testAPIRegisterMissingField"'
+            }// EndExecutionStageErrortjobn
+            sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobn 2'
+          }// EndStepstjobn
+        }// EndStagetjobn
 } // End Parallel
 } // End Stage
     stage('TEARDOWN-Infrastructure') {
