@@ -64,4 +64,9 @@ public class MainPage extends BasePage {
     }
     public boolean hasNavLink(String label) {return driver.findElements(NAV_LINKS).stream().anyMatch(e -> e.getText().contains(label));}
     public boolean hasPostText(String postText) {return driver.getPageSource().contains(postText);}
+
+    /*** True when a rendered post contains an @mention link to the given user's profile.*/
+    public boolean hasMentionLink(String username) {
+        return isPresent(By.cssSelector("#card-block a[href*='profile.html?username=" + username + "']"));
+    }
 }

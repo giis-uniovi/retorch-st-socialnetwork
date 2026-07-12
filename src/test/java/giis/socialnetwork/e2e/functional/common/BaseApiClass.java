@@ -165,13 +165,14 @@ public class BaseApiClass {
         );
     }
 
-    protected static List<NameValuePair> composePostPayload(String username, long userId, String text) {
+    protected static List<NameValuePair> composePostPayload(String username, long userId, String text,
+                                                            String mediaIds, String mediaTypes) {
         return Arrays.asList(
                 new BasicNameValuePair("username", username),
                 new BasicNameValuePair("user_id", String.valueOf(userId)),
                 new BasicNameValuePair("text", text),
-                new BasicNameValuePair("media_ids", "[]"),
-                new BasicNameValuePair("media_types", "[]"),
+                new BasicNameValuePair("media_ids", mediaIds),
+                new BasicNameValuePair("media_types", mediaTypes),
                 new BasicNameValuePair("post_type", "0")
         );
     }
@@ -252,8 +253,18 @@ public class BaseApiClass {
      * on success with body "Successfully upload post".
      */
     protected int composePost(String username, long userId, String text) throws IOException {
+        return composePost(username, userId, text, "[]", "[]");
+    }
+
+    /**
+     * Composes a post with media attachments. {@code mediaIds}/{@code mediaTypes}
+     * are JSON arrays as the wrk2 API expects them, e.g.
+     * {@code ["123456789012345678"]} / {@code ["png"]}.
+     */
+    protected int composePost(String username, long userId, String text,
+                              String mediaIds, String mediaTypes) throws IOException {
         int status = postFormStatus(wrk2PostUrl("/compose"),
-                composePostPayload(username, userId, text));
+                composePostPayload(username, userId, text, mediaIds, mediaTypes));
         log.debug("Composed post for user '{}': HTTP {}", username, status);
         return status;
     }

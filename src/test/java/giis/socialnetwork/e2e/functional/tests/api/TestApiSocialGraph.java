@@ -73,6 +73,33 @@ class TestApiSocialGraph extends BaseApiClass {
                 "User B (id=" + userBId + ") must appear in A's followee list");
     }
 
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @Test
+    @DisplayName("TestAPIUnfollowNotFollowedIsIdempotent")
+    void testAPIUnfollowNotFollowedIsIdempotent() throws IOException {
+        String[] userA = createUserWithName("ia");
+        String[] userB = createUserWithName("ib");
+        String[] userC = createUserWithName("ic");
+        String userCId = userC[1];
+
+        // Baseline: A follows C (also keeps the followee set non-empty for get_followee)
+        followUser(userA[0], userC[0]);
+
+        // Unfollowing B, whom A never followed, must not fail nor disturb the graph
+        int status = unfollowUser(userA[0], userB[0]);
+        Assertions.assertEquals(200, status, "Unfollowing a non-followed user must still return HTTP 200");
+
+        loginUser(userA[0], userA[2]);
+        JsonArray followees = getFollowees();
+        Assertions.assertAll(
+                () -> Assertions.assertTrue(containsByField(followees, FOLLOWEEID, userCId),
+                        "C must still be followed after the no-op unfollow"),
+                () -> Assertions.assertEquals(1, followees.size(),
+                        "The followee list must be unchanged by the no-op unfollow")
+        );
+    }
+
     @AccessMode(resID = "social-graph", concurrency = 10, sharing = true, accessMode = "READONLY")
     @Test
     @DisplayName("TestAPIGetFollowersWithoutSessionUnauthorized")
