@@ -5,7 +5,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 
-public class MainPage extends BasePage {
+public class MainPage extends TimelinePage {
 
     private static final By NAVBAR_BRAND = By.cssSelector("a.navbar-brand");
     private static final By NAV_LINKS = By.cssSelector(".navbar-nav .nav-link");
@@ -19,54 +19,35 @@ public class MainPage extends BasePage {
 
     public MainPage open() {
         navigate("/main.html");
-        waiter.waitForMainPage();
+        waitUntilLoaded();
         return this;
     }
 
-    /** Opens the compose panel and waits until the post textarea is visible. */
-    private void showComposeForm() {
-        click(SHOW_POST);
-        waiter.waitUntil(ExpectedConditions.visibilityOfElementLocated(POST_CONTENT), "Post textarea not visible");
+    public boolean hasNavLink(String label) {return driver.findElements(NAV_LINKS).stream().anyMatch(e -> e.getText().contains(label));}
+    public ProfilePage openProfile() {
+        return new ProfilePage(driver, waiter, sutUrl).open();
+    }
+    public ContactPage goToContacts() {
+        return new ContactPage(driver, waiter, sutUrl).open();
+    }
+    public String getBrandText() {
+        return text(NAVBAR_BRAND);
     }
 
+    /** Opens the compose panel and waits until the post textarea is visible. */
+    public MainPage openComposeForm() {
+        click(SHOW_POST);
+        waiter.waitUntil(ExpectedConditions.visibilityOfElementLocated(POST_CONTENT), "Post textarea not visible");
+        return this;
+    }
+
+    public boolean isComposeFormVisible() {return isDisplayed(POST_CONTENT) && isDisplayed(CREATE_POST);}
+
     public MainPage composePost(String postText) {
-        showComposeForm();
+        openComposeForm();
         fill(POST_CONTENT, postText);
         click(CREATE_POST);
         return this;
     }
 
-    public void waitForPost(String postText) {
-        waiter.waitForPostText(postText, driver);
-    }
-
-    /*** Navigates to profile.html, which renders the logged-in user's own user-timeline.*/
-    public MainPage openProfile() {
-        navigate("/profile.html");
-        waiter.waitForMainPage();
-        return this;
-    }
-
-    public ContactPage goToContacts() {
-        navigate("/contact.html");
-        waiter.waitForContactPage();
-        return new ContactPage(driver, waiter, sutUrl);
-    }
-
-
-    public boolean isComposeFormVisible() {
-        showComposeForm();
-        return isDisplayed(POST_CONTENT) && isDisplayed(CREATE_POST);
-    }
-
-    public String getBrandText() {
-        return text(NAVBAR_BRAND);
-    }
-    public boolean hasNavLink(String label) {return driver.findElements(NAV_LINKS).stream().anyMatch(e -> e.getText().contains(label));}
-    public boolean hasPostText(String postText) {return driver.getPageSource().contains(postText);}
-
-    /*** True when a rendered post contains an @mention link to the given user's profile.*/
-    public boolean hasMentionLink(String username) {
-        return isPresent(By.cssSelector("#card-block a[href*='profile.html?username=" + username + "']"));
-    }
 }

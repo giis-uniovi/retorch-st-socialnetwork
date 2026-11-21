@@ -1,15 +1,20 @@
 package giis.socialnetwork.e2e.functional.tests;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import giis.retorch.annotations.AccessMode;
 import giis.socialnetwork.e2e.functional.common.BaseLoggedClass;
+import giis.socialnetwork.e2e.functional.common.TestUser;
 import giis.socialnetwork.e2e.functional.pages.ContactPage;
 import giis.socialnetwork.e2e.functional.pages.LoginPage;
 import giis.socialnetwork.e2e.functional.pages.MainPage;
 import giis.socialnetwork.e2e.functional.pages.SignupPage;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("ui")
 class TestNavigation extends BaseLoggedClass {
 
     @AccessMode(resID = "frontend", concurrency = 10, sharing = true, accessMode = "READONLY")
@@ -18,41 +23,37 @@ class TestNavigation extends BaseLoggedClass {
     @Test
     @DisplayName("testNavigation")
     void testNavigation() {
-        TestUser user = newUser("e2eUser");
+        TestUser user = TestUser.generate("e2eUser");
 
-        // 1. Verify Login Page Structure
-        LoginPage loginPage = new LoginPage(driver, waiter, sutUrl).open();
-        Assertions.assertAll("Login Page Checks",
-                () -> Assertions.assertTrue(loginPage.isUsernameDisplayed(), "Username field must be visible"),
-                () -> Assertions.assertTrue(loginPage.isPasswordDisplayed(), "Password field must be visible"),
-                () -> Assertions.assertTrue(loginPage.isSignUpLinkDisplayed(), "Sign Up link must be visible")
+        LoginPage login = loginPage().open();
+        assertAll("Login Page Checks",
+                () -> assertTrue(login.isUsernameDisplayed(), "Username field must be visible"),
+                () -> assertTrue(login.isPasswordDisplayed(), "Password field must be visible"),
+                () -> assertTrue(login.isSignUpLinkDisplayed(), "Sign Up link must be visible")
         );
 
-        // 2. Verify Signup Page Structure
-        SignupPage signupPage = new SignupPage(driver, waiter, sutUrl).open();
-        Assertions.assertAll("Signup Page Checks",
-                () -> Assertions.assertTrue(signupPage.isFirstNameDisplayed(), "first_name field must be visible"),
-                () -> Assertions.assertTrue(signupPage.isLastNameDisplayed(), "last_name field must be visible"),
-                () -> Assertions.assertTrue(signupPage.isUsernameDisplayed(), "username field must be visible"),
-                () -> Assertions.assertTrue(signupPage.isPasswordDisplayed(), "password field must be visible"),
-                () -> Assertions.assertTrue(signupPage.isLoginLinkDisplayed(), "Login link must be visible")
+        SignupPage signup = signupPage().open();
+        assertAll("Signup Page Checks",
+                () -> assertTrue(signup.isFirstNameDisplayed(), "first_name field must be visible"),
+                () -> assertTrue(signup.isLastNameDisplayed(), "last_name field must be visible"),
+                () -> assertTrue(signup.isUsernameDisplayed(), "username field must be visible"),
+                () -> assertTrue(signup.isPasswordDisplayed(), "password field must be visible"),
+                () -> assertTrue(signup.isLoginLinkDisplayed(), "Login link must be visible")
         );
 
-        // 3. Register, Login, and Verify Main Page Navbar
-        MainPage mainPage = signupPage
+        MainPage main = signup
                 .register("EndToEnd", "User", user.username, user.password)
                 .login(user.username, user.password);
 
-        Assertions.assertAll("Main Page Navbar Checks",
-                () -> Assertions.assertTrue(mainPage.hasNavLink("Post"), "Navbar must contain a 'Post' link"),
-                () -> Assertions.assertTrue(mainPage.hasNavLink("Contacts"), "Navbar must contain a 'Contacts' link")
+        assertAll("Main Page Navbar Checks",
+                () -> assertTrue(main.hasNavLink("Post"), "Navbar must contain a 'Post' link"),
+                () -> assertTrue(main.hasNavLink("Contacts"), "Navbar must contain a 'Contacts' link")
         );
 
-        // 4. Navigate to Contacts Page and Verify Sections
-        ContactPage contactPage = mainPage.goToContacts();
-        Assertions.assertAll("Contact Page Checks",
-                () -> Assertions.assertTrue(contactPage.isFollowerListDisplayed(), "follower-list section must be visible"),
-                () -> Assertions.assertTrue(contactPage.isFolloweeListDisplayed(), "followee-list section must be visible")
+        ContactPage contact = main.goToContacts();
+        assertAll("Contact Page Checks",
+                () -> assertTrue(contact.isFollowerListDisplayed(), "follower-list section must be visible"),
+                () -> assertTrue(contact.isFolloweeListDisplayed(), "followee-list section must be visible")
         );
     }
 }

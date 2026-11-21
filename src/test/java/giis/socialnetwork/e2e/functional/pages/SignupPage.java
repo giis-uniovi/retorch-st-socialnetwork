@@ -17,26 +17,30 @@ public class SignupPage extends BasePage {
         super(driver, waiter, sutUrl);
     }
 
-    public SignupPage open() {
-        navigate("/signup.html");
-        waiter.waitForSignupPage();
-        return this;
-    }
-
-    public LoginPage register(String firstName, String lastName, String username, String password) {
-        waiter.waitForSignupPage();
-        fill(FIRST_NAME, firstName);
-        fill(LAST_NAME, lastName);
-        fill(USERNAME, username);
-        fill(PASSWORD, password);
-        click(SIGNUP_BTN);
-        waiter.waitForLoginPage();
-        return new LoginPage(driver, waiter, sutUrl);
-    }
+    @Override
+    protected By loadedMarker() {return FIRST_NAME;}
 
     public boolean isFirstNameDisplayed() {return isDisplayed(FIRST_NAME);}
     public boolean isLastNameDisplayed() {return isDisplayed(LAST_NAME);}
     public boolean isUsernameDisplayed() {return isDisplayed(USERNAME);}
     public boolean isPasswordDisplayed() {return isDisplayed(PASSWORD);}
     public boolean isLoginLinkDisplayed() {return isDisplayed(LOGIN_LINK);}
+
+    public SignupPage open() {
+        navigate("/signup.html");
+        waitUntilLoaded();
+        return this;
+    }
+
+    public LoginPage register(String firstName, String lastName, String username, String password) {
+        waitUntilLoaded();
+        fill(FIRST_NAME, firstName);
+        fill(LAST_NAME, lastName);
+        fill(USERNAME, username);
+        fill(PASSWORD, password);
+        click(SIGNUP_BTN);
+        LoginPage login = new LoginPage(driver, waiter, sutUrl);
+        login.waitUntilLoaded();
+        return login;
+    }
 }

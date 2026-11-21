@@ -1,22 +1,30 @@
 package giis.socialnetwork.e2e.functional.tests.api;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 import giis.retorch.annotations.AccessMode;
+import giis.socialnetwork.e2e.functional.common.ApiUser;
 import giis.socialnetwork.e2e.functional.common.BaseApiClass;
-import org.junit.jupiter.api.Assertions;
+import giis.socialnetwork.e2e.functional.dto.Post;
+import giis.socialnetwork.e2e.functional.dto.Url;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
 
-/**
- * Validates post composition and user-timeline retrieval:
- * <ul>
- *   <li>POST /wrk2-api/post/compose            — create a post (HTTP 200)</li>
- *   <li>GET  /wrk2-api/user-timeline/read      — read back the composed post, incl. @mention extraction</li>
- * </ul>
- */
+import static giis.socialnetwork.e2e.functional.utils.ApiAssert.assertAnyMatch;
+import static giis.socialnetwork.e2e.functional.utils.ApiAssert.assertNoneMatch;
+import static giis.socialnetwork.e2e.functional.utils.ApiAssert.assertStatus;
+import static giis.socialnetwork.e2e.functional.utils.HttpStatus.HTTP_OK;
+import static giis.socialnetwork.e2e.functional.utils.HttpStatus.HTTP_BAD_REQUEST;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** API tests for {@code POST /wrk2-api/post/compose} and {@code GET /wrk2-api/user-timeline/read}. */
+@Tag("api")
 class TestApiPosts extends BaseApiClass {
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -25,16 +33,10 @@ class TestApiPosts extends BaseApiClass {
     @Test
     @DisplayName("TestAPIComposePost")
     void testAPIComposePost() throws IOException {
-        String[] author = createUserWithName("compose");
-        String username = author[0];
-        long userId = Long.parseLong(author[1]);
+        ApiUser author = createAuthorWithFollower("compose");
 
-        // social-graph-service rejects ZADD with an empty member set; author must have ≥1 follower.
-        String[] follower = createUserWithName("composefollower");
-        followUser(follower[0], username);
-
-        int status = composePost(username, userId, "Hello from API test " + unique());
-        Assertions.assertEquals(200, status, "Compose post must return HTTP 200");
+        int status = composePost(author, "Hello from API test " + unique());
+        assertStatus(HTTP_OK, status, "Compose post");
     }
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -43,27 +45,23 @@ class TestApiPosts extends BaseApiClass {
     @Test
     @DisplayName("TestAPIReadUserTimeline")
     void testAPIReadUserTimeline() throws IOException {
-        String[] user = createUserWithName("timeline");
-        String username = user[0];
-        long userId = Long.parseLong(user[1]);
+        ApiUser user = createUser("timeline");
         String postText = "Timeline test post " + unique();
 
-        composePost(username, userId, postText);
+        // No social-graph resource in @AccessMode, so no follower is arranged and the compose status is ignored.
+        composePost(user, postText);
 
-        String url = timelineReadUrl(wrk2UserTimelineUrl(READPATH), userId, 0, 10);
-        JsonArray timeline = getJsonArray(url);
-        Assertions.assertFalse(timeline.isEmpty(), "User timeline must contain at least one post after composing");
+        List<Post> timeline = readUserTimeline(user.userId);
+        assertFalse(timeline.isEmpty(), "User timeline must contain at least one post after composing");
 
-        JsonObject post = timeline.get(0).getAsJsonObject();
-        Assertions.assertAll(
-                () -> Assertions.assertTrue(post.has("post_id"), "Post must have 'post_id'"),
-                () -> Assertions.assertTrue(post.has("creator"), "Post must have 'creator'"),
-                () -> Assertions.assertTrue(post.has("text"), "Post must have 'text'"),
-                () -> Assertions.assertTrue(post.has("timestamp"), "Post must have 'timestamp'")
+        Post post = timeline.get(0);
+        assertAll(
+                () -> assertNotNull(post.getPostId(), "Post must have 'post_id'"),
+                () -> assertNotNull(post.getCreator(), "Post must have 'creator'"),
+                () -> assertNotNull(post.getText(), "Post must have 'text'"),
+                () -> assertNotNull(post.getTimestamp(), "Post must have 'timestamp'")
         );
-
-        JsonObject creator = post.get("creator").getAsJsonObject();
-        Assertions.assertEquals(username, creator.get("username").getAsString(),
+        assertEquals(user.username, post.getCreator().getUsername(),
                 "Post creator username must match the author");
     }
 
@@ -73,29 +71,25 @@ class TestApiPosts extends BaseApiClass {
     @Test
     @DisplayName("TestAPIComposePostWithMentionPopulatesUserMentions")
     void testAPIComposePostWithMentionPopulatesUserMentions() throws IOException {
-        String[] author = createUserWithName("mentionauthor");
-        String authorName = author[0];
-        long authorId = Long.parseLong(author[1]);
-        String[] mentioned = createUserWithName("mentioned");
-        String mentionedName = mentioned[0];
+        ApiUser author = createUser("mentionauthor");
+        ApiUser mentioned = createUser("mentioned");
 
-        composePost(authorName, authorId, "hi @" + mentionedName + " " + unique());
+        // No social-graph resource in @AccessMode, so no follower is arranged and the compose status is ignored.
+        composePost(author, "hi @" + mentioned.username + " " + unique());
 
-        String url = timelineReadUrl(wrk2UserTimelineUrl(READPATH), authorId, 0, 10);
-        JsonArray timeline = getJsonArray(url);
-        Assertions.assertFalse(timeline.isEmpty(), "Author timeline must contain the composed post");
+        List<Post> timeline = readUserTimeline(author.userId);
+        assertFalse(timeline.isEmpty(), "Author timeline must contain the composed post");
 
-        JsonArray mentions = timeline.get(0).getAsJsonObject().getAsJsonArray("user_mentions");
-        Assertions.assertTrue(containsByField(mentions, "username", mentionedName),
-                "Mentioned user '" + mentionedName + "' must appear in the post's user_mentions");
+        assertAnyMatch(timeline.get(0).getUserMentions(), m -> mentioned.username.equals(m.getUsername()),
+                "Mentioned user '" + mentioned.username + "' must appear in the post's user_mentions");
     }
 
     @AccessMode(resID = "user-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
     @Test
     @DisplayName("TestAPIReadUserTimelineBadRequest")
     void testAPIReadUserTimelineBadRequest() throws IOException {
-        int status = getStatus(wrk2UserTimelineUrl(READPATH));
-        Assertions.assertEquals(400, status, "Timeline read without required params must return HTTP 400");
+        int status = anonymous.userTimelineStatusWithoutParams();
+        assertStatus(HTTP_BAD_REQUEST, status, "Timeline read without required params");
     }
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -105,35 +99,29 @@ class TestApiPosts extends BaseApiClass {
     @Test
     @DisplayName("TestAPIUserTimelinePagination")
     void testAPIUserTimelinePagination() throws IOException {
-        String[] author = createUserWithName("paging");
-        String username = author[0];
-        long userId = Long.parseLong(author[1]);
-        String[] follower = createUserWithName("pagingfollower");
-        followUser(follower[0], username);
+        ApiUser author = createAuthorWithFollower("paging");
 
-        // Three posts, composed oldest to newest; the timeline serves newest first
         for (int i = 1; i <= 3; i++) {
-            composePost(username, userId, "Page post " + i + " " + username);
+            composePostOrFail(author, "Page post " + i + " " + author.username);
         }
 
-        JsonArray all = getJsonArray(timelineReadUrl(wrk2UserTimelineUrl(READPATH), userId, 0, 10));
-        JsonArray firstPage = getJsonArray(timelineReadUrl(wrk2UserTimelineUrl(READPATH), userId, 0, 2));
-        JsonArray secondPage = getJsonArray(timelineReadUrl(wrk2UserTimelineUrl(READPATH), userId, 2, 10));
+        List<Post> all = readUserTimeline(author.userId, 0, 10);
+        List<Post> firstPage = readUserTimeline(author.userId, 0, 2);
+        List<Post> secondPage = readUserTimeline(author.userId, 2, 10);
 
-        Assertions.assertAll(
-                () -> Assertions.assertEquals(3, all.size(), "Full read must return all three posts"),
-                () -> Assertions.assertEquals(2, firstPage.size(),
+        assertAll(
+                () -> assertEquals(3, all.size(), "Full read must return all three posts"),
+                () -> assertEquals(2, firstPage.size(),
                         "start=0&stop=2 must return exactly two posts (stop is exclusive)"),
-                () -> Assertions.assertEquals(1, secondPage.size(),
+                () -> assertEquals(1, secondPage.size(),
                         "start=2&stop=10 must return the remaining post"),
-                () -> Assertions.assertEquals("Page post 3 " + username,
-                        all.get(0).getAsJsonObject().get("text").getAsString(),
-                        "The timeline must be ordered newest first")
+                () -> assertEquals("Page post 3 " + author.username,
+                        all.get(0).getText(),
+                        "The timeline must be ordered newest first"),
+                () -> assertEquals("Page post 1 " + author.username,
+                        secondPage.get(0).getText(),
+                        "The second page must contain the oldest post only")
         );
-        // The two pages must not overlap: the second page's post is the oldest one
-        Assertions.assertEquals("Page post 1 " + username,
-                secondPage.get(0).getAsJsonObject().get("text").getAsString(),
-                "The second page must contain the oldest post only");
     }
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -143,22 +131,16 @@ class TestApiPosts extends BaseApiClass {
     @Test
     @DisplayName("TestAPIComposePostWithMediaAttachesMedia")
     void testAPIComposePostWithMediaAttachesMedia() throws IOException {
-        String[] author = createUserWithName("media");
-        String username = author[0];
-        long userId = Long.parseLong(author[1]);
-        String[] follower = createUserWithName("mediafollower");
-        followUser(follower[0], username);
+        ApiUser author = createAuthorWithFollower("media");
 
         String mediaId = "123456789012345678";
-        int status = composePost(username, userId, "Post with media " + unique(),
+        int status = composePost(author, "Post with media " + unique(),
                 "[\"" + mediaId + "\"]", "[\"png\"]");
-        Assertions.assertEquals(200, status, "Compose with media must return HTTP 200");
+        assertStatus(HTTP_OK, status, "Compose with media");
 
-        JsonArray timeline = getJsonArray(timelineReadUrl(wrk2UserTimelineUrl(READPATH), userId, 0, 10));
-        Assertions.assertFalse(timeline.isEmpty(), "Timeline must contain the composed post");
-        JsonArray media = timeline.get(0).getAsJsonObject().getAsJsonArray("media");
-        Assertions.assertTrue(containsByField(media, "media_id", mediaId),
-                "The post's media list must contain the attached media id");
+        List<Post> timeline = readUserTimeline(author.userId);
+        assertFalse(timeline.isEmpty(), "Timeline must contain the composed post");
+        assertAnyMatch(timeline.get(0).getMedia(), m -> mediaId.equals(m.getMediaId()), "The post's media list must contain the attached media id");
     }
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -168,25 +150,82 @@ class TestApiPosts extends BaseApiClass {
     @Test
     @DisplayName("TestAPIComposePostShortensUrls")
     void testAPIComposePostShortensUrls() throws IOException {
-        String[] author = createUserWithName("urls");
-        String username = author[0];
-        long userId = Long.parseLong(author[1]);
-        String[] follower = createUserWithName("urlsfollower");
-        followUser(follower[0], username);
+        ApiUser author = createAuthorWithFollower("urls");
 
-        composePost(username, userId, "check http://example.com/page" + unique() + " out");
+        composePostOrFail(author, "check http://example.com/page" + unique() + " out");
 
-        JsonArray timeline = getJsonArray(timelineReadUrl(wrk2UserTimelineUrl(READPATH), userId, 0, 10));
-        Assertions.assertFalse(timeline.isEmpty(), "Timeline must contain the composed post");
-        JsonObject post = timeline.get(0).getAsJsonObject();
-        JsonArray urls = post.getAsJsonArray("urls");
-        Assertions.assertFalse(urls.isEmpty(), "The post must contain a shortened URL entry");
-        String shortened = urls.get(0).getAsJsonObject().get("shortened_url").getAsString();
-        Assertions.assertAll(
-                () -> Assertions.assertTrue(shortened.startsWith("https://short-url/"),
+        List<Post> timeline = readUserTimeline(author.userId);
+        assertFalse(timeline.isEmpty(), "Timeline must contain the composed post");
+        Post post = timeline.get(0);
+        List<Url> urls = post.getUrls();
+        assertFalse(urls.isEmpty(), "The post must contain a shortened URL entry");
+        String shortened = urls.get(0).getShortenedUrl();
+        assertAll(
+                () -> assertTrue(shortened.startsWith("https://short-url/"),
                         "url-shorten-service must rewrite the link to the short-url host, got: " + shortened),
-                () -> Assertions.assertTrue(post.get("text").getAsString().contains(shortened),
+                () -> assertTrue(post.getText().contains(shortened),
                         "The post text must contain the shortened URL instead of the original")
         );
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "user-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
+    @Test
+    @DisplayName("TestAPIReadUserTimelineWithoutPostsIsEmpty")
+    void testAPIReadUserTimelineWithoutPostsIsEmpty() throws IOException {
+        ApiUser user = createUser("noposts");
+
+        assertTrue(readUserTimeline(user.userId).isEmpty(), "A user without posts must have an empty timeline");
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "user-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
+    @Test
+    @DisplayName("TestAPIComposePostWithEmptyTextBadRequest")
+    void testAPIComposePostWithEmptyTextBadRequest() throws IOException {
+        ApiUser author = createAuthorWithFollower("empty");
+
+        assertStatus(HTTP_BAD_REQUEST, composePost(author, ""), "Compose with empty text");
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "user-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
+    @Tag("known-quirk")
+    @Test
+    @DisplayName("TestAPIComposePostWithMismatchedMediaIsSilentlyDropped")
+    void testAPIComposePostWithMismatchedMediaIsSilentlyDropped() throws IOException {
+        // Known quirk: media_ids/media_types of different length answer HTTP 200 but the post is never stored.
+        ApiUser author = createAuthorWithFollower("badmedia");
+        String lostText = "Lost " + unique();
+        String keptText = "Kept " + unique();
+
+        assertStatus(HTTP_OK, composePost(author, lostText, "[\"123\"]", "[]"), "Compose with mismatched media");
+        composePostOrFail(author, keptText);
+
+        List<Post> timeline = readUserTimeline(author.userId);
+        assertAll(
+                () -> assertAnyMatch(timeline, p -> keptText.equals(p.getText()), "The valid post must be stored"),
+                () -> assertNoneMatch(timeline, p -> lostText.equals(p.getText()),
+                        "The post with mismatched media must not be stored")
+        );
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "user-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
+    @Test
+    @DisplayName("TestAPIUserTimelinePaginationBeyondSizeIsEmpty")
+    void testAPIUserTimelinePaginationBeyondSizeIsEmpty() throws IOException {
+        ApiUser author = createAuthorWithFollower("beyond");
+        composePostOrFail(author, "Only post " + unique());
+
+        assertTrue(readUserTimeline(author.userId, 5, 10).isEmpty(),
+                "A page that starts beyond the timeline size must be empty");
     }
 }

@@ -1,42 +1,36 @@
 package giis.socialnetwork.e2e.functional.tests.api;
 
-import com.google.gson.JsonArray;
 import giis.retorch.annotations.AccessMode;
+import giis.socialnetwork.e2e.functional.common.ApiUser;
 import giis.socialnetwork.e2e.functional.common.BaseApiClass;
-import org.junit.jupiter.api.Assertions;
+import giis.socialnetwork.e2e.functional.dto.Post;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
+import java.util.List;
 
-/**
- * Validates the home-timeline service end-to-end:
- * <ul>
- *   <li>GET /wrk2-api/home-timeline/read — feed of followed users' posts (JSON array)</li>
- * </ul>
- * The home timeline is populated asynchronously via RabbitMQ and
- * write-home-timeline-service, so tests poll until the post propagates
- * or the {@link #HOME_TIMELINE_TIMEOUT_MS} deadline is reached.
- */
+import static giis.socialnetwork.e2e.functional.utils.ApiAssert.assertNoneMatch;
+import static giis.socialnetwork.e2e.functional.utils.ApiAssert.assertStatus;
+import static giis.socialnetwork.e2e.functional.utils.HttpStatus.HTTP_OK;
+import static giis.socialnetwork.e2e.functional.utils.HttpStatus.HTTP_BAD_REQUEST;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+/** API tests for {@code GET /wrk2-api/home-timeline/read}; the feed is filled asynchronously, so tests poll. */
+@Tag("api")
 class TestApiTimeline extends BaseApiClass {
-
-    private static final long HOME_TIMELINE_TIMEOUT_MS = 15_000;
-    private static final long HOME_TIMELINE_POLL_MS = 500;
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "home-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
     @Test
     @DisplayName("TestAPIHomeTimelineReturnsArray")
     void testAPIHomeTimelineReturnsArray() throws IOException {
-        String[] reader = createUserWithName("htreader");
-        long readerId = Long.parseLong(reader[1]);
+        ApiUser reader = createUser("htreader");
 
-        String url = timelineReadUrl(wrk2HomeTimelineUrl(READPATH), readerId, 0, 10);
-        JsonArray timeline = getJsonArray(url);
-        // A new user has an empty home timeline — the array must still be valid JSON
-        Assertions.assertNotNull(timeline, "Home timeline response must be a valid JSON array");
+        List<Post> timeline = readHomeTimeline(reader.userId);
+        assertEquals(0, timeline.size(), "A fresh user's home timeline must be empty");
     }
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -46,50 +40,15 @@ class TestApiTimeline extends BaseApiClass {
     @Test
     @DisplayName("TestAPIHomeTimelineShowsFollowedUserPost")
     void testAPIHomeTimelineShowsFollowedUserPost() throws IOException {
-        // Create the author (User B) and the reader (User A)
-        String[] userB = createUserWithName("htauthor");
-        String userBName = userB[0];
-        long userBId = Long.parseLong(userB[1]);
+        ApiUser author = createUser("htauthor");
+        ApiUser follower = createUser("htfollower");
 
-        String[] userA = createUserWithName("htfollower");
-        long userAId = Long.parseLong(userA[1]);
+        followOrFail(follower, author);
 
-        // A follows B (no auth needed)
-        followUser(userA[0], userBName);
-
-        // B composes a post (re-login as B so cookie is correct for any auth-gated calls)
-        loginUser(userBName, userB[2]);
         String uniqueText = "HTpost" + unique();
-        composePost(userBName, userBId, uniqueText);
+        composePostOrFail(author, uniqueText);
 
-        // Re-login as A to use A's session (not strictly needed for wrk2 endpoints but
-        // ensures the cookie store is tidy for future authenticated calls in the test)
-        loginUser(userA[0], userA[2]);
-
-        JsonArray timeline = pollHomeTimeline(userAId, uniqueText);
-        Assertions.assertTrue(containsByField(timeline, "text", uniqueText),
-                "Post '" + uniqueText + "' must appear in A's home timeline within "
-                        + HOME_TIMELINE_TIMEOUT_MS + " ms");
-    }
-
-    /**
-     * Polls {@code GET /wrk2-api/home-timeline/read} for {@code userId} until
-     * a post with {@code expectedText} appears or {@link #HOME_TIMELINE_TIMEOUT_MS} elapses.
-     * Uses {@link LockSupport#parkNanos} to avoid Sonar rule {@code java:S2925}.
-     */
-    private JsonArray pollHomeTimeline(long userId, String expectedText) throws IOException {
-        String url = timelineReadUrl(wrk2HomeTimelineUrl(READPATH), userId, 0, 10);
-        long deadline = System.currentTimeMillis() + HOME_TIMELINE_TIMEOUT_MS;
-        JsonArray timeline;
-        do {
-            timeline = getJsonArray(url);
-            if (containsByField(timeline, "text", expectedText)
-                    || System.currentTimeMillis() >= deadline) {
-                return timeline;
-            }
-            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(HOME_TIMELINE_POLL_MS));
-        } while (!Thread.currentThread().isInterrupted());
-        return timeline;
+        awaitHomeTimelinePost(follower.userId, uniqueText);
     }
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -99,36 +58,103 @@ class TestApiTimeline extends BaseApiClass {
     @Test
     @DisplayName("TestAPIHomeTimelineExcludesOwnPosts")
     void testAPIHomeTimelineExcludesOwnPosts() throws IOException {
-        String[] author = createUserWithName("ownauthor");
-        String authorName = author[0];
-        long authorId = Long.parseLong(author[1]);
-        String[] follower = createUserWithName("ownfollower");
-        long followerId = Long.parseLong(follower[1]);
-
-        // The author needs ≥1 follower before composing (empty-ZADD returns HTTP 500)
-        followUser(follower[0], authorName);
+        ApiUser author = createUser("ownauthor");
+        ApiUser follower = addFollower(author);
 
         String uniqueText = "OwnPost" + unique();
-        composePost(authorName, authorId, uniqueText);
+        composePostOrFail(author, uniqueText);
 
-        // Wait until the async fan-out delivered the post to the follower's home timeline...
-        JsonArray followerTimeline = pollHomeTimeline(followerId, uniqueText);
-        Assertions.assertTrue(containsByField(followerTimeline, "text", uniqueText),
-                "Post must reach the follower's home timeline within " + HOME_TIMELINE_TIMEOUT_MS + " ms");
+        awaitHomeTimelinePost(follower.userId, uniqueText);
 
-        // ...then verify the author's own home timeline never includes the author's own post
-        JsonArray authorTimeline = getJsonArray(
-                timelineReadUrl(wrk2HomeTimelineUrl(READPATH), authorId, 0, 10));
-        Assertions.assertFalse(containsByField(authorTimeline, "text", uniqueText),
+        List<Post> authorTimeline = readHomeTimeline(author.userId);
+        assertNoneMatch(authorTimeline, p -> uniqueText.equals(p.getText()),
                 "The home timeline must not include the reader's own posts");
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "home-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
+    @Test
+    @DisplayName("TestAPIHomeTimelinePagination")
+    void testAPIHomeTimelinePagination() throws IOException {
+        ApiUser author = createUser("pgauthor");
+        ApiUser follower = addFollower(author);
+
+        for (int i = 1; i <= 3; i++) {
+            composePostOrFail(author, "HomePage post " + i + " " + author.username);
+        }
+
+        List<Post> all = awaitHomeTimeline(follower.userId, "all three posts", timeline -> timeline.size() >= 3);
+        assertEquals(3, all.size(), "The home timeline must contain exactly the three posts");
+
+        List<Post> firstPage = readHomeTimeline(follower.userId, 0, 2);
+        List<Post> secondPage = readHomeTimeline(follower.userId, 2, 10);
+        assertAll(
+                () -> assertEquals(2, firstPage.size(),
+                        "start=0&stop=2 must return exactly two posts (stop is exclusive)"),
+                () -> assertEquals(1, secondPage.size(), "start=2&stop=10 must return the remaining post"),
+                () -> assertEquals("HomePage post 3 " + author.username,
+                        all.get(0).getText(),
+                        "The home timeline must be ordered newest first"),
+                () -> assertEquals("HomePage post 1 " + author.username, secondPage.get(0).getText(),
+                        "The second page must contain the oldest post only")
+        );
     }
 
     @AccessMode(resID = "home-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
     @Test
     @DisplayName("TestAPIHomeTimelineBadRequest")
     void testAPIHomeTimelineBadRequest() throws IOException {
-        int status = getStatus(wrk2HomeTimelineUrl(READPATH));
-        Assertions.assertEquals(400, status,
-                "Home timeline read without required params must return HTTP 400");
+        int status = anonymous.homeTimelineStatusWithoutParams();
+        assertStatus(HTTP_BAD_REQUEST, status, "Home timeline read without required params");
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "home-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
+    @Test
+    @DisplayName("TestAPIHomeTimelineStopsAfterUnfollow")
+    void testAPIHomeTimelineStopsAfterUnfollow() throws IOException {
+        ApiUser author = createUser("unfauthor");
+        ApiUser leaver = addFollower(author);
+        ApiUser stayer = addFollower(author);
+
+        assertStatus(HTTP_OK, unfollowUser(leaver.username, author.username), "Unfollow");
+
+        String uniqueText = "AfterUnfollow" + unique();
+        composePostOrFail(author, uniqueText);
+
+        // Wait for the remaining follower first, so the negative check on the leaver is not a blind wait.
+        awaitHomeTimelinePost(stayer.userId, uniqueText);
+        assertNoneMatch(readHomeTimeline(leaver.userId), p -> uniqueText.equals(p.getText()),
+                "A post composed after the unfollow must not reach the former follower");
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "post", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "home-timeline", concurrency = 10, sharing = true, accessMode = "READONLY")
+    @Test
+    @DisplayName("TestAPIHomeTimelineMergesTwoAuthorsNewestFirst")
+    void testAPIHomeTimelineMergesTwoAuthorsNewestFirst() throws IOException {
+        ApiUser first = createUser("mergea");
+        ApiUser second = createUser("mergeb");
+        ApiUser reader = createUser("mergereader");
+        followOrFail(reader, first);
+        followOrFail(reader, second);
+
+        String firstText = "FromFirst" + unique();
+        String secondText = "FromSecond" + unique();
+        composePostOrFail(first, firstText);
+        awaitHomeTimelinePost(reader.userId, firstText);
+        composePostOrFail(second, secondText);
+
+        List<Post> timeline = awaitHomeTimeline(reader.userId, "both posts", t -> t.size() >= 2);
+        assertAll(
+                () -> assertEquals(secondText, timeline.get(0).getText(), "The newest post must come first"),
+                () -> assertEquals(firstText, timeline.get(1).getText(), "The older post must come second")
+        );
     }
 }

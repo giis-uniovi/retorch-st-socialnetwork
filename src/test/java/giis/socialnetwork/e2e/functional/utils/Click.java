@@ -1,6 +1,6 @@
 package giis.socialnetwork.e2e.functional.utils;
 
-import giis.socialnetwork.e2e.functional.common.ElementNotFoundException;
+import giis.socialnetwork.e2e.functional.common.ElementNotClickableException;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -13,10 +13,7 @@ public class Click {
 
     private Click() {}
 
-    /**
-     * Clicks {@code element} using the standard Selenium click; falls back to a
-     * JavaScript click if the first attempt fails (e.g. element obscured by an overlay).
-     */
+    /** Selenium click, falling back to a JS click if it fails (e.g. obscured element). */
     public static void element(WebDriver driver, WebElement element) {
         try {
             log.debug("Clicking element: {}", element);
@@ -26,7 +23,7 @@ public class Click {
             try {
                 ((JavascriptExecutor) driver).executeScript("arguments[0].click();", element);
             } catch (Exception jsEx) {
-                throw new ElementNotFoundException("Could not click element: " + jsEx.getMessage());
+                throw new ElementNotClickableException("Could not click element: " + jsEx.getMessage(), jsEx);
             }
         }
     }

@@ -5,6 +5,10 @@
 
 This repository contains an end-to-end test suite for the DeathStarBench social network benchmark, orchestrated with RETORCH. The suite exercises the social network UI and APIs through Selenium and HTTP-based tests.
 
+<p align="center">
+  <img src="img/hero-socialnetwork.svg" alt="Main screen of the DeathStar social network (the home feed) on desktop and mobile" width="900"/>
+</p>
+
 ## Prerequisites
 
 - Java 8 or newer
@@ -67,3 +71,9 @@ To stop and remove the local compose deployment:
 ```bash
 docker compose --env-file .retorch/envfiles/local.env -p local down --volumes
 ```
+
+---
+
+<p align="center">
+  <a href="https://giis.uniovi.es/"><img src="img/giis-footer.svg" alt="GIIS - Software Engineering Research Group, University of Oviedo" height="28"/></a>
+</p>

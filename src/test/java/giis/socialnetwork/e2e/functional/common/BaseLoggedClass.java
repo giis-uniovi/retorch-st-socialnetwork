@@ -19,32 +19,41 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 
 @ExtendWith(LifecycleJunit5.class)
 public class BaseLoggedClass {
 
     protected static final Logger log = LoggerFactory.getLogger(BaseLoggedClass.class);
 
-    private static final SeleManager seleManager = new SeleManager(new SelemaConfig()
-            .setReportSubdir("target/containerlogs/"
-                    + (System.getProperty("TJOB_NAME") == null ? "" : System.getProperty("TJOB_NAME")))
-            .setName(System.getProperty("TJOB_NAME") == null ? "locallogs" : System.getProperty("TJOB_NAME")));
+    private static final SeleManager seleManager = createSeleManager();
 
     protected static String sutUrl;
     protected WebDriver driver;
     protected Waiter waiter;
 
-    @BeforeAll
-    static void setupAll() throws IOException {
-        log.info("Starting global browser setup");
-        sutUrl = SutConfig.resolveSutUrl();
-        setupBrowser();
-        log.info("Global browser setup complete. SUT: {}", sutUrl);
+    private static SeleManager createSeleManager() {
+        String tjob = SutConfig.tjobName();
+        return new SeleManager(new SelemaConfig()
+                .setReportSubdir("target/containerlogs/" + (tjob == null ? "" : tjob))
+                .setName(tjob == null ? "locallogs" : tjob));
     }
 
-    protected static void setupBrowser() {
-        seleManager.setBrowser("chrome").setArguments(new String[]{"--start-maximized", "--incognito"});
-        if (System.getenv("SELENOID_PRESENT") != null) {
+    @BeforeAll
+    static void setupAll() throws IOException {
+        sutUrl = SutConfig.resolveSutUrl();
+        setupBrowser();
+        log.debug("Global browser setup complete. SUT: {}", sutUrl);
+    }
+
+    protected static void setupBrowser() throws IOException {
+        boolean remote = System.getenv("SELENOID_PRESENT") != null;
+        // locally, skip Chrome's proxy auto-detection (adds ~20 s to the first navigation of every new browser)
+        String[] args = remote
+                ? new String[]{"--start-maximized", "--incognito"}
+                : new String[]{"--start-maximized", "--incognito", "--no-proxy-server"};
+        seleManager.setBrowser(SutConfig.resolveBrowser()).setArguments(args);
+        if (remote) {
             log.debug("Setting up Selenium WebDriver with Selenium-hub");
             seleManager.setDriverUrl("http://selenium-hub:4444/wd/hub")
                     .add(new DynamicGridBrowserService().setVideo())
@@ -54,46 +63,39 @@ public class BaseLoggedClass {
 
     @BeforeEach
     void setup(TestInfo testInfo) {
-        log.info("Starting setup for test: {}", testInfo.getDisplayName());
+        log.debug("Starting setup for test: {}", testInfo.getDisplayName());
         driver = seleManager.getDriver();
         waiter = new Waiter(driver);
         driver.get(sutUrl + "/index.html");
-        log.info("Setup complete, starting: {}", testInfo.getDisplayName());
     }
 
     @AfterEach
     void tearDown(TestInfo testInfo) {
-        log.info("Tearing down test: {}", testInfo.getDisplayName());
+        log.debug("Tearing down test: {}", testInfo.getDisplayName());
         driver.get(sutUrl + "/index.html");
     }
 
-    // ── UI user fixture ───────────────────────────────────────────────────────
 
-    /** Immutable credentials for a UI test user, unique per {@link #newUser(String)} call. */
-    public static final class TestUser {
-        public final String username;
-        public final String password;
+    protected LoginPage loginPage() {return new LoginPage(driver, waiter, sutUrl);}
+    protected SignupPage signupPage() {return new SignupPage(driver, waiter, sutUrl);}
 
-        TestUser(String username, String password) {
-            this.username = username;
-            this.password = password;
+
+    /** Registers {@code user} through the HTTP API (fast fixture) and returns the numeric user id. */
+    protected long registerViaApi(TestUser user) {
+        try (SocialNetworkApi api = new SocialNetworkApi(sutUrl)) {
+            int status = api.register("E2E", "User", user.username, user.password);
+            if (status != 200) {
+                throw new IllegalStateException("API registration of " + user.username + " failed with HTTP " + status);
+            }
+            return api.login(user.username, user.password);
+        } catch (IOException e) {
+            throw new UncheckedIOException("API fixture failed for " + user.username, e);
         }
     }
 
-    /** Creates unique credentials derived from {@code label} and the current timestamp. */
-    protected TestUser newUser(String label) {
-        long ts = System.currentTimeMillis();
-        return new TestUser(label + ts, "pwd" + ts);
-    }
-
-    /** Registers {@code user} through the signup page, landing on the login page. */
-    protected LoginPage registerUser(TestUser user) {
-        return new SignupPage(driver, waiter, sutUrl).open()
-                .register("E2E", "User", user.username, user.password);
-    }
-
-    /** Registers {@code user} and logs in, landing on the main feed page. */
+    /** Registers {@code user} via the API and logs in through the UI, landing on the main feed page. */
     protected MainPage registerAndLogin(TestUser user) {
-        return registerUser(user).login(user.username, user.password);
+        registerViaApi(user);
+        return loginPage().open().login(user.username, user.password);
     }
 }

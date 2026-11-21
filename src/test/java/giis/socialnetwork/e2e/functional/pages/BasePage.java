@@ -8,11 +8,7 @@ import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 
-/**
- * Shared infrastructure for every page object: holds the {@link WebDriver}, {@link Waiter}
- * and SUT base URL, and exposes the common navigation/interaction helpers so concrete pages
- * only declare their own locators and page-specific behaviour.
- */
+/** Base page object: driver, waiter, SUT URL and common navigation/interaction helpers. */
 public abstract class BasePage {
 
     protected final WebDriver driver;
@@ -25,7 +21,16 @@ public abstract class BasePage {
         this.sutUrl = sutUrl;
     }
 
-    /**Navigates to {@code sutUrl + path}; callers follow with a page-specific wait.*/
+    /** Locator of the element whose visibility marks this page as loaded. */
+    protected abstract By loadedMarker();
+
+    /** Waits (navigation timeout) until this page's loaded marker is visible. */
+    public void waitUntilLoaded() {
+        waiter.navWaitUntil(ExpectedConditions.visibilityOfElementLocated(loadedMarker()),
+                getClass().getSimpleName() + " did not load");
+    }
+
+    /**Navigates to {@code sutUrl + path}; callers follow with {@link #waitUntilLoaded()}.*/
     protected void navigate(String path) {
         driver.get(sutUrl + path);
     }
@@ -35,7 +40,7 @@ public abstract class BasePage {
         try {
             type(locator, value);
         } catch (WebDriverException domChangedMidInteraction) {
-            // The document changed while typing (stale node during a page transition); re-locate once.
+            // stale node during a page transition: re-locate once
             type(locator, value);
         }
     }
@@ -56,8 +61,10 @@ public abstract class BasePage {
         return driver.findElement(locator).getText();
     }
 
+    /** True if the element exists and is displayed; false if it is absent. */
     protected boolean isDisplayed(By locator) {
-        return driver.findElement(locator).isDisplayed();
+        java.util.List<WebElement> found = driver.findElements(locator);
+        return !found.isEmpty() && found.get(0).isDisplayed();
     }
 
     /*** True if at least one element matches — use for containers whose CSS visibility is unreliable.*/

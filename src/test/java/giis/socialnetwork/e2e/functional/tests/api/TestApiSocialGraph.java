@@ -1,37 +1,39 @@
 package giis.socialnetwork.e2e.functional.tests.api;
 
-import com.google.gson.JsonArray;
 import giis.retorch.annotations.AccessMode;
+import giis.socialnetwork.e2e.functional.common.ApiUser;
 import giis.socialnetwork.e2e.functional.common.BaseApiClass;
-import org.junit.jupiter.api.Assertions;
+import giis.socialnetwork.e2e.functional.dto.Followee;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
 
-/**
- * Validates the social-graph endpoints exposed through the Nginx gateway:
- * <ul>
- *   <li>POST /api/user/follow       — follow a user by username (HTTP 200 after redirect)</li>
- *   <li>POST /api/user/unfollow     — unfollow a user by username (HTTP 200)</li>
- *   <li>GET  /api/user/get_follower — list followers of the logged-in user (JWT auth)</li>
- *   <li>GET  /api/user/get_followee — list followees of the logged-in user (JWT auth)</li>
- * </ul>
- */
+import static giis.socialnetwork.e2e.functional.utils.ApiAssert.assertAnyMatch;
+import static giis.socialnetwork.e2e.functional.utils.ApiAssert.assertNoneMatch;
+import static giis.socialnetwork.e2e.functional.utils.ApiAssert.assertStatus;
+import static giis.socialnetwork.e2e.functional.utils.HttpStatus.HTTP_OK;
+import static giis.socialnetwork.e2e.functional.utils.HttpStatus.HTTP_UNAUTHORIZED;
+import static giis.socialnetwork.e2e.functional.utils.HttpStatus.HTTP_SERVER_ERROR;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+/** API tests for {@code /api/user/follow}, {@code unfollow}, {@code get_follower} and {@code get_followee}. */
+@Tag("api")
 class TestApiSocialGraph extends BaseApiClass {
-
-    private static final String FOLLOWEEID = "followee_id";
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("TestAPIFollowUser")
     void testAPIFollowUser() throws IOException {
-        String[] userA = createUserWithName("follower");
-        String[] userB = createUserWithName("followee");
+        ApiUser userA = createUser("follower");
+        ApiUser userB = createUser("followee");
 
-        int status = followUser(userA[0], userB[0]);
-        Assertions.assertEquals(200, status, "Follow must return HTTP 200 (redirect to contact.html followed)");
+        int status = followUser(userA.username, userB.username);
+        assertStatus(HTTP_OK, status, "Follow (redirect to contact.html followed)");
     }
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -39,19 +41,13 @@ class TestApiSocialGraph extends BaseApiClass {
     @Test
     @DisplayName("TestaAPIGetFollowers")
     void testAPIGetFollowers() throws IOException {
-        String[] userA = createUserWithName("fa");
-        String userAId = userA[1];
-        String[] userB = createUserWithName("fb");
+        ApiUser userA = createUser("fa");
+        ApiUser userB = createUser("fb");
 
-        // A follows B by username — no auth required for this endpoint
-        followUser(userA[0], userB[0]);
+        followOrFail(userA, userB);
 
-        // Re-login as B so the cookie store holds B's JWT (get_follower reads user_id from the token)
-        loginUser(userB[0], userB[2]);
-
-        JsonArray followers = getFollowers();
-        Assertions.assertTrue(containsByField(followers, "follower_id", userAId),
-                "User A (id=" + userAId + ") must appear in B's follower list");
+        assertAnyMatch(userB.followers(), f -> f.getFollowerId() == userA.userId,
+                "User A (id=" + userA.userId + ") must appear in B's follower list");
     }
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -59,18 +55,13 @@ class TestApiSocialGraph extends BaseApiClass {
     @Test
     @DisplayName("TestAPIGetFolloweesWithToken")
     void testAPIGetFolloweesWithToken() throws IOException {
-        String[] userA = createUserWithName("ga");
-        String[] userB = createUserWithName("gb");
-        String userBId = userB[1];
+        ApiUser userA = createUser("ga");
+        ApiUser userB = createUser("gb");
 
-        followUser(userA[0], userB[0]);
+        followOrFail(userA, userB);
 
-        // Re-login as A so the cookie store holds A's JWT (get_followee reads user_id from the token)
-        loginUser(userA[0], userA[2]);
-
-        JsonArray followees = getFollowees();
-        Assertions.assertTrue(containsByField(followees, FOLLOWEEID, userBId),
-                "User B (id=" + userBId + ") must appear in A's followee list");
+        assertAnyMatch(userA.followees(), f -> f.getFolloweeId() == userB.userId,
+                "User B (id=" + userB.userId + ") must appear in A's followee list");
     }
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -78,24 +69,20 @@ class TestApiSocialGraph extends BaseApiClass {
     @Test
     @DisplayName("TestAPIUnfollowNotFollowedIsIdempotent")
     void testAPIUnfollowNotFollowedIsIdempotent() throws IOException {
-        String[] userA = createUserWithName("ia");
-        String[] userB = createUserWithName("ib");
-        String[] userC = createUserWithName("ic");
-        String userCId = userC[1];
+        ApiUser userA = createUser("ia");
+        ApiUser userB = createUser("ib");
+        ApiUser userC = createUser("ic");
 
-        // Baseline: A follows C (also keeps the followee set non-empty for get_followee)
-        followUser(userA[0], userC[0]);
+        followOrFail(userA, userC);
 
-        // Unfollowing B, whom A never followed, must not fail nor disturb the graph
-        int status = unfollowUser(userA[0], userB[0]);
-        Assertions.assertEquals(200, status, "Unfollowing a non-followed user must still return HTTP 200");
+        int status = unfollowUser(userA.username, userB.username);
+        assertStatus(HTTP_OK, status, "Unfollowing a non-followed user");
 
-        loginUser(userA[0], userA[2]);
-        JsonArray followees = getFollowees();
-        Assertions.assertAll(
-                () -> Assertions.assertTrue(containsByField(followees, FOLLOWEEID, userCId),
+        List<Followee> followees = userA.followees();
+        assertAll(
+                () -> assertAnyMatch(followees, f -> f.getFolloweeId() == userC.userId,
                         "C must still be followed after the no-op unfollow"),
-                () -> Assertions.assertEquals(1, followees.size(),
+                () -> assertEquals(1, followees.size(),
                         "The followee list must be unchanged by the no-op unfollow")
         );
     }
@@ -104,11 +91,8 @@ class TestApiSocialGraph extends BaseApiClass {
     @Test
     @DisplayName("TestAPIGetFollowersWithoutSessionUnauthorized")
     void testAPIGetFollowersWithoutSessionUnauthorized() throws IOException {
-        // get_follower requires the login_token JWT cookie; without a session it must be rejected.
-        cookieStore.clear();
-        int status = getStatus(userUrl("/get_follower"));
-        Assertions.assertEquals(401, status,
-                "get_follower without a login_token cookie must return HTTP 401");
+        int status = anonymous.followersStatus();
+        assertStatus(HTTP_UNAUTHORIZED, status, "get_follower without a login_token cookie");
     }
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -116,31 +100,88 @@ class TestApiSocialGraph extends BaseApiClass {
     @Test
     @DisplayName("TestAPIUnfollowRemovesFollowee")
     void testAPIUnfollowRemovesFollowee() throws IOException {
-        String[] userA = createUserWithName("ua");
-        String[] userB = createUserWithName("ub");
-        String[] userC = createUserWithName("uc");
-        String userBId = userB[1];
-        String userCId = userC[1];
+        ApiUser userA = createUser("ua");
+        ApiUser userB = createUser("ub");
+        ApiUser userC = createUser("uc");
 
-        // A follows both B and C; keeping C means get_followee never reads an empty set
-        // (social-graph-service rejects ZADD with an empty member set, returning HTTP 500).
-        followUser(userA[0], userB[0]);
-        followUser(userA[0], userC[0]);
-        loginUser(userA[0], userA[2]);
+        // C keeps the followee set non-empty (see createAuthorWithFollower for the empty-ZADD quirk).
+        followOrFail(userA, userB);
+        followOrFail(userA, userC);
 
-        JsonArray before = getFollowees();
-        Assertions.assertAll(
-                () -> Assertions.assertTrue(containsByField(before, FOLLOWEEID, userBId), "B must be followed initially"),
-                () -> Assertions.assertTrue(containsByField(before, FOLLOWEEID, userCId), "C must be followed initially")
+        List<Followee> before = userA.followees();
+        assertAll(
+                () -> assertAnyMatch(before, f -> f.getFolloweeId() == userB.userId, "B must be followed initially"),
+                () -> assertAnyMatch(before, f -> f.getFolloweeId() == userC.userId, "C must be followed initially")
         );
 
-        int status = unfollowUser(userA[0], userB[0]);
-        Assertions.assertEquals(200, status, "Unfollow must return HTTP 200");
+        int status = unfollowUser(userA.username, userB.username);
+        assertStatus(HTTP_OK, status, "Unfollow");
 
-        JsonArray after = getFollowees();
-        Assertions.assertAll(
-                () -> Assertions.assertFalse(containsByField(after, FOLLOWEEID, userBId), "B must be gone after unfollow"),
-                () -> Assertions.assertTrue(containsByField(after, FOLLOWEEID, userCId), "C must still be followed")
+        List<Followee> after = userA.followees();
+        assertAll(
+                () -> assertNoneMatch(after, f -> f.getFolloweeId() == userB.userId, "B must be gone after unfollow"),
+                () -> assertAnyMatch(after, f -> f.getFolloweeId() == userC.userId, "C must still be followed")
         );
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @Tag("known-quirk")
+    @Test
+    @DisplayName("TestAPIGetFolloweesWithoutFolloweesReturnsServerError")
+    void testAPIGetFolloweesWithoutFolloweesReturnsServerError() throws IOException {
+        // Known quirk: an empty followee set makes the empty ZADD fail, so get_followee answers HTTP 500.
+        ApiUser loner = createUser("loner");
+
+        assertStatus(HTTP_SERVER_ERROR, loner.api.followeesStatus(), "get_followee for a user without followees");
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @Tag("known-quirk")
+    @Test
+    @DisplayName("TestAPIFollowSelf")
+    void testAPIFollowSelf() throws IOException {
+        // Known quirk: self-follow is accepted and the user becomes its own follower and followee.
+        ApiUser user = createUser("selfie");
+
+        assertStatus(HTTP_OK, followUser(user.username, user.username), "Following oneself");
+        assertAll(
+                () -> assertAnyMatch(user.followees(), f -> f.getFolloweeId() == user.userId,
+                        "The user must appear in its own followee list"),
+                () -> assertAnyMatch(user.followers(), f -> f.getFollowerId() == user.userId,
+                        "The user must appear in its own follower list")
+        );
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @Tag("known-quirk")
+    @Test
+    @DisplayName("TestAPIFollowUnknownUserFails")
+    void testAPIFollowUnknownUserFails() throws IOException {
+        // Known quirk: an unregistered user on either side is reported as HTTP 500 rather than a 4xx.
+        ApiUser user = createUser("fu");
+        String ghost = "ghost" + unique();
+
+        assertAll(
+                () -> assertStatus(HTTP_SERVER_ERROR, followUser(user.username, ghost), "Following an unknown user"),
+                () -> assertStatus(HTTP_SERVER_ERROR, followUser(ghost, user.username), "Following as an unknown user")
+        );
+    }
+
+    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "social-graph", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @Test
+    @DisplayName("TestAPIFollowTwiceIsIdempotent")
+    void testAPIFollowTwiceIsIdempotent() throws IOException {
+        ApiUser userA = createUser("ta");
+        ApiUser userB = createUser("tb");
+
+        followOrFail(userA, userB);
+        followOrFail(userA, userB);
+
+        List<Followee> followees = userA.followees();
+        assertEquals(1, followees.size(), "A repeated follow must keep a single followee entry, got: " + followees);
     }
 }

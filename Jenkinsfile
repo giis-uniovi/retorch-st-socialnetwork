@@ -50,7 +50,7 @@ pipeline {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobc 0 http://tjobc-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobc 0 http://tjobc-nginx-thrift:8080 "TestApiTimeline#testAPIHomeTimelineExcludesOwnPosts,TestApiTimeline#testAPIHomeTimelineShowsFollowedUserPost"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobc 0 http://tjobc-nginx-thrift:8080 "TestApiTimeline#testAPIHomeTimelineExcludesOwnPosts,TestApiTimeline#testAPIHomeTimelineMergesTwoAuthorsNewestFirst,TestApiTimeline#testAPIHomeTimelinePagination,TestApiTimeline#testAPIHomeTimelineShowsFollowedUserPost,TestApiTimeline#testAPIHomeTimelineStopsAfterUnfollow"'
             }// EndExecutionStageErrortjobc
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobc 0'
           }// EndStepstjobc
@@ -86,7 +86,7 @@ pipeline {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobg 0 http://tjobg-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobg 0 http://tjobg-nginx-thrift:8080 "TestLogin#testLogin,TestNavigation#testNavigation,TestLogin#testRegister,TestPosts#testVisibilityComposeForm"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobg 0 http://tjobg-nginx-thrift:8080 "TestLogin#testLogin,TestLogin#testLoginWithWrongPasswordDoesNotReachMainPage,TestNavigation#testNavigation,TestLogin#testRegister,TestPosts#testVisibilityComposeForm"'
             }// EndExecutionStageErrortjobg
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobg 0'
           }// EndStepstjobg
@@ -100,7 +100,7 @@ pipeline {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobh 1 http://tjobh-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobh 1 http://tjobh-nginx-thrift:8080 "TestApiPosts#testAPIComposePostShortensUrls,TestApiPosts#testAPIComposePostWithMediaAttachesMedia,TestApiPosts#testAPIUserTimelinePagination"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobh 1 http://tjobh-nginx-thrift:8080 "TestApiPosts#testAPIComposePostShortensUrls,TestApiPosts#testAPIComposePostWithEmptyTextBadRequest,TestApiPosts#testAPIComposePostWithMediaAttachesMedia,TestApiPosts#testAPIComposePostWithMismatchedMediaIsSilentlyDropped,TestApiPosts#testAPIUserTimelinePagination,TestApiPosts#testAPIUserTimelinePaginationBeyondSizeIsEmpty"'
             }// EndExecutionStageErrortjobh
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobh 1'
           }// EndStepstjobh
@@ -109,7 +109,7 @@ pipeline {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobi 1 http://tjobi-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobi 1 http://tjobi-nginx-thrift:8080 "TestApiPosts#testAPIComposePostWithMentionPopulatesUserMentions,TestApiPosts#testAPIReadUserTimeline"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobi 1 http://tjobi-nginx-thrift:8080 "TestApiPosts#testAPIComposePostWithMentionPopulatesUserMentions,TestApiPosts#testAPIReadUserTimeline,TestApiPosts#testAPIReadUserTimelineWithoutPostsIsEmpty"'
             }// EndExecutionStageErrortjobi
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobi 1'
           }// EndStepstjobi
@@ -141,7 +141,7 @@ pipeline {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobl 2 http://tjobl-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobl 2 http://tjobl-nginx-thrift:8080 "TestApiSocialGraph#testAPIFollowUser,TestApiSocialGraph#testAPIGetFolloweesWithToken,TestApiSocialGraph#testAPIGetFollowers,TestApiSocialGraph#testAPIUnfollowNotFollowedIsIdempotent,TestApiSocialGraph#testAPIUnfollowRemovesFollowee"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobl 2 http://tjobl-nginx-thrift:8080 "TestApiSocialGraph#testAPIFollowSelf,TestApiSocialGraph#testAPIFollowTwiceIsIdempotent,TestApiSocialGraph#testAPIFollowUnknownUserFails,TestApiSocialGraph#testAPIFollowUser,TestApiSocialGraph#testAPIGetFolloweesWithToken,TestApiSocialGraph#testAPIGetFolloweesWithoutFolloweesReturnsServerError,TestApiSocialGraph#testAPIGetFollowers,TestApiSocialGraph#testAPIUnfollowNotFollowedIsIdempotent,TestApiSocialGraph#testAPIUnfollowRemovesFollowee"'
             }// EndExecutionStageErrortjobl
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobl 2'
           }// EndStepstjobl
@@ -150,7 +150,7 @@ pipeline {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobm 2 http://tjobm-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobm 2 http://tjobm-nginx-thrift:8080 "TestApiUsers#testAPILoginUser,TestApiUsers#testAPILoginWrongPasswordStatus,TestApiUsers#testAPIRegisterDuplicateUsername,TestApiUsers#testAPIRegisterUser,TestApiUsers#testLoginWrongPassword"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobm 2 http://tjobm-nginx-thrift:8080 "TestApiUsers#testAPILoginUnknownUserIssuesNoToken,TestApiUsers#testAPIRegisterMissingField"'
             }// EndExecutionStageErrortjobm
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobm 2'
           }// EndStepstjobm
@@ -159,7 +159,7 @@ pipeline {
           steps {
             catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
               sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-setup.sh tjobn 2 http://tjobn-nginx-thrift:8080'
-              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobn 2 http://tjobn-nginx-thrift:8080 "TestApiUsers#testAPIRegisterMissingField"'
+              sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-testexecution.sh tjobn 2 http://tjobn-nginx-thrift:8080 "TestApiUsers#testAPILoginUser,TestApiUsers#testAPILoginWrongPasswordStatus,TestApiUsers#testAPIRegisterDuplicateUsername,TestApiUsers#testAPIRegisterUser,TestApiUsers#testLoginWrongPassword"'
             }// EndExecutionStageErrortjobn
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobn 2'
           }// EndStepstjobn

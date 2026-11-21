@@ -5,6 +5,9 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ContactPage extends BasePage {
 
     private static final By FOLLOWER_LIST = By.id("follower-list");
@@ -20,35 +23,28 @@ public class ContactPage extends BasePage {
         super(driver, waiter, sutUrl);
     }
 
+    @Override
+    protected By loadedMarker() {return By.id("followee-name");}
+
     public ContactPage open() {
         navigate("/contact.html");
-        waiter.waitForContactPage();
+        waitUntilLoaded();
         return this;
     }
 
     public boolean isFollowerListDisplayed() {return isPresent(FOLLOWER_LIST);}
     public boolean isFolloweeListDisplayed() {return isPresent(FOLLOWEE_LIST);}
 
-    /**
-     * Submits a follow/unfollow form. Both follow.lua and unfollow.lua redirect to contact.html,
-     * so the submit click drives the navigation itself — we only wait for the contact page to
-     * settle. Adding an explicit re-navigation here would race (and cancel) the in-flight POST
-     * under load.
-     */
+    /** Submits a follow/unfollow form; no re-navigation, it would race the in-flight POST. */
     private ContactPage submitFollowForm(By input, By submit, String username) {
         fill(input, username);
         click(submit);
-        waiter.waitForContactPage();
+        waitUntilLoaded();
         return this;
     }
 
-    public ContactPage followUser(String username) {
-        return submitFollowForm(FOLLOW_INPUT, FOLLOW_SUBMIT, username);
-    }
-
-    public ContactPage unfollowUser(String username) {
-        return submitFollowForm(UNFOLLOW_INPUT, UNFOLLOW_SUBMIT, username);
-    }
+    public ContactPage followUser(String username) {return submitFollowForm(FOLLOW_INPUT, FOLLOW_SUBMIT, username);}
+    public ContactPage unfollowUser(String username) {return submitFollowForm(UNFOLLOW_INPUT, UNFOLLOW_SUBMIT, username);}
 
     /*** Waits (with the longer navigation timeout) for the asynchronous get-followee XHR to render.*/
     public void waitForFolloweeCount(int expected) {
@@ -56,11 +52,19 @@ public class ContactPage extends BasePage {
                 "Followee list did not reach " + expected + " entries");
     }
 
-    /*** Number of followee entries populated with a numeric id by get-followee.js.*/
     public int followeeCount() {
-        return (int) driver.findElements(FOLLOWEE_IDS).stream()
-                .map(WebElement::getText)
-                .filter(t -> t.matches("\\d+"))
-                .count();
+        return followeeIds().size();
+    }
+
+    /*** Numeric ids of the followees rendered by get-followee.js, in page order.*/
+    public List<String> followeeIds() {
+        List<String> ids = new ArrayList<>();
+        for (WebElement e : driver.findElements(FOLLOWEE_IDS)) {
+            String t = e.getText().trim();
+            if (t.matches("\\d+")) {
+                ids.add(t);
+            }
+        }
+        return ids;
     }
 }

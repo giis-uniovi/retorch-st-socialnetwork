@@ -1,12 +1,20 @@
 package giis.socialnetwork.e2e.functional.tests;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import giis.retorch.annotations.AccessMode;
 import giis.socialnetwork.e2e.functional.common.BaseLoggedClass;
+import giis.socialnetwork.e2e.functional.common.TestUser;
 import giis.socialnetwork.e2e.functional.pages.ContactPage;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+
+@Tag("ui")
 class TestSocialGraph extends BaseLoggedClass {
 
     @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
@@ -16,23 +24,24 @@ class TestSocialGraph extends BaseLoggedClass {
     @Test
     @DisplayName("TestFollowAndUnfollow")
     void testFollowAndUnfollow() {
-        TestUser userA = newUser("sga");
-        TestUser userB = newUser("sgb");
-        TestUser userC = newUser("sgc");
+        TestUser userA = TestUser.generate("sga");
+        TestUser userB = TestUser.generate("sgb");
+        TestUser userC = TestUser.generate("sgc");
 
-        // Register the two followees first (no login needed to be followed by username)
-        registerUser(userB);
-        registerUser(userC);
+        String idB = String.valueOf(registerViaApi(userB));
+        String idC = String.valueOf(registerViaApi(userC));
 
         ContactPage contact = registerAndLogin(userA).goToContacts();
 
-        // Follow both so the followee list never empties (an empty get_followee returns HTTP 500)
+        // Follow both: an empty get_followee returns HTTP 500
         contact.followUser(userB.username).followUser(userC.username);
         contact.waitForFolloweeCount(2);
-        Assertions.assertEquals(2, contact.followeeCount(), "Both followees must appear after following B and C");
+        assertEquals(new HashSet<>(Arrays.asList(idB, idC)), new HashSet<>(contact.followeeIds()),
+                "The followees must be exactly B and C");
 
         contact.unfollowUser(userB.username);
         contact.waitForFolloweeCount(1);
-        Assertions.assertEquals(1, contact.followeeCount(), "One followee must remain after unfollowing B");
+        assertEquals(Collections.singletonList(idC), contact.followeeIds(),
+                "Only C must remain after unfollowing B");
     }
 }
