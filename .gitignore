@@ -2,6 +2,7 @@ target
 reports
 pom.xml.versionsBackup
 TESTS-TestSuites.xml
+.vscode
 
 .classpath
 .project
@@ -10,3 +11,6 @@ TESTS-TestSuites.xml
 .idea
 # to allow each developer customize sonarlint
 org.sonarlint.eclipse.core.prefs
+
+# Never commit binaries (e.g. the RETORCH standalone orchestration jar)
+*.jar
