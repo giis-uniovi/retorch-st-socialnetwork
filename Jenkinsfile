@@ -10,20 +10,20 @@ pipeline {
   } // EndPipOptions
   stages {
     stage('Clean Workspace') {
-        steps {
-            cleanWs()
-        } // EndStepsCleanWS
+      steps {
+        cleanWs()
+      } // EndStepsCleanWS
     } // EndStageCleanWS
     stage('Clone Project') {
-        steps {
-            checkout scm
-        } // EndStepsCloneProject
+      steps {
+        checkout scm
+      } // EndStepsCloneProject
     } // EndStageCloneProject
     stage('SETUP-Infrastructure') {
-        steps {
-            sh 'chmod +x -R $SCRIPTS_FOLDER'
-            sh '$SCRIPTS_FOLDER/coilifecycles/coi-setup.sh'
-        } // EndStepsSETUPINF
+      steps {
+        sh 'chmod +x -R $SCRIPTS_FOLDER'
+        sh '$SCRIPTS_FOLDER/coilifecycles/coi-setup.sh'
+      } // EndStepsSETUPINF
     } // EndStageSETUPInf
     stage('Stage 0') {
       failFast false
@@ -91,8 +91,8 @@ pipeline {
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobg 0'
           }// EndStepstjobg
         }// EndStagetjobg
-} // End Parallel
-} // End Stage
+      } // End Parallel
+    } // End Stage
     stage('Stage 1') {
       failFast false
       parallel {
@@ -132,8 +132,8 @@ pipeline {
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobk 1'
           }// EndStepstjobk
         }// EndStagetjobk
-} // End Parallel
-} // End Stage
+      } // End Parallel
+    } // End Stage
     stage('Stage 2') {
       failFast false
       parallel {
@@ -164,28 +164,28 @@ pipeline {
             sh '$SCRIPTS_FOLDER/tjoblifecycles/tjob-teardown.sh tjobn 2'
           }// EndStepstjobn
         }// EndStagetjobn
-} // End Parallel
-} // End Stage
+      } // End Parallel
+    } // End Stage
     stage('TEARDOWN-Infrastructure') {
       steps {
-          sh '$SCRIPTS_FOLDER/coilifecycles/coi-teardown.sh'
+        sh '$SCRIPTS_FOLDER/coilifecycles/coi-teardown.sh'
       } // EndStepsTearDownInf
     } // EndStageTearDown
     stage('Usage-Profile') {
       steps {
-          catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-              sh '$SCRIPTS_FOLDER/generateusageprofile.sh'
-          }
+        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+          sh '$SCRIPTS_FOLDER/generateusageprofile.sh'
+        }
       } // EndStepsUsageProfile
     } // EndStageUsageProfile
-} // EndStagesPipeline
-post {
+  } // EndStagesPipeline
+  post {
     always {
-        archiveArtifacts artifacts: 'artifacts/*.csv', onlyIfSuccessful: true
-        archiveArtifacts artifacts: 'artifacts/usageprofile/*.html', allowEmptyArchive: true
-        publishHTML(target: [reportDir: 'artifacts/usageprofile', reportFiles: 'usageprofile.html', reportName: 'RETORCH Usage Profile', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
-        archiveArtifacts artifacts: 'target/testlogs/**/*.*', onlyIfSuccessful: false
-        archiveArtifacts artifacts: 'target/containerlogs/**/*.*', onlyIfSuccessful: false
+      archiveArtifacts artifacts: 'artifacts/*.csv', onlyIfSuccessful: true
+      archiveArtifacts artifacts: 'artifacts/usageprofile/*.html', allowEmptyArchive: true
+      publishHTML(target: [reportDir: 'artifacts/usageprofile', reportFiles: 'usageprofile.html', reportName: 'RETORCH Usage Profile', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
+      archiveArtifacts artifacts: 'target/testlogs/**/*.*', onlyIfSuccessful: false
+      archiveArtifacts artifacts: 'target/containerlogs/**/*.*', onlyIfSuccessful: false
     }// EndAlways
-} // EndPostActions
+  } // EndPostActions
 } // EndPipeline
