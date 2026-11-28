@@ -9,20 +9,6 @@
     },
     "resourceType": "LOGICAL",
     "resourceID": "web-browser",
-    "minimalCapacities": [
-      {
-        "name": "memory",
-        "quantity": 0.048
-      },
-      {
-        "name": "processor",
-        "quantity": 0.25
-      },
-      {
-        "name": "storage",
-        "quantity": 0.31
-      }
-    ],
     "dockerImage": "web-browser;eexit/mirror-http-server"
   },
   "frontend": {
@@ -35,20 +21,6 @@
     },
     "resourceType": "LOGICAL",
     "resourceID": "frontend",
-    "minimalCapacities": [
-      {
-        "name": "memory",
-        "quantity": 0.048
-      },
-      {
-        "name": "processor",
-        "quantity": 0.25
-      },
-      {
-        "name": "storage",
-        "quantity": 0.31
-      }
-    ],
     "dockerImage": "frontend;eexit/mirror-http-server"
   },
   "user": {
@@ -61,20 +33,6 @@
     },
     "resourceType": "LOGICAL",
     "resourceID": "user",
-    "minimalCapacities": [
-      {
-        "name": "memory",
-        "quantity": 0.048
-      },
-      {
-        "name": "processor",
-        "quantity": 0.25
-      },
-      {
-        "name": "storage",
-        "quantity": 0.31
-      }
-    ],
     "dockerImage": "user;eexit/mirror-http-server"
   },
   "post": {
@@ -87,20 +45,6 @@
     },
     "resourceType": "LOGICAL",
     "resourceID": "post",
-    "minimalCapacities": [
-      {
-        "name": "memory",
-        "quantity": 0.048
-      },
-      {
-        "name": "processor",
-        "quantity": 0.25
-      },
-      {
-        "name": "storage",
-        "quantity": 0.31
-      }
-    ],
     "dockerImage": "post;eexit/mirror-http-server"
   },
   "social-graph": {
@@ -113,20 +57,6 @@
     },
     "resourceType": "LOGICAL",
     "resourceID": "social-graph",
-    "minimalCapacities": [
-      {
-        "name": "memory",
-        "quantity": 0.048
-      },
-      {
-        "name": "processor",
-        "quantity": 0.25
-      },
-      {
-        "name": "storage",
-        "quantity": 0.31
-      }
-    ],
     "dockerImage": "social-graph;eexit/mirror-http-server"
   },
   "home-timeline": {
@@ -139,20 +69,6 @@
     },
     "resourceType": "LOGICAL",
     "resourceID": "home-timeline",
-    "minimalCapacities": [
-      {
-        "name": "memory",
-        "quantity": 0.048
-      },
-      {
-        "name": "processor",
-        "quantity": 0.25
-      },
-      {
-        "name": "storage",
-        "quantity": 0.31
-      }
-    ],
     "dockerImage": "home-timeline;eexit/mirror-http-server"
   },
   "user-timeline": {
@@ -165,20 +81,6 @@
     },
     "resourceType": "LOGICAL",
     "resourceID": "user-timeline",
-    "minimalCapacities": [
-      {
-        "name": "memory",
-        "quantity": 0.048
-      },
-      {
-        "name": "processor",
-        "quantity": 0.25
-      },
-      {
-        "name": "storage",
-        "quantity": 0.31
-      }
-    ],
     "dockerImage": "user-timeline;eexit/mirror-http-server"
   }
 }

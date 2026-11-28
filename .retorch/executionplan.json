@@ -1,0 +1,87 @@
+{
+  "tjobs" : [ {
+    "id" : "tjoba",
+    "stage" : 0,
+    "resources" : [ "social-graph" ],
+    "tests" : [ "TestApiSocialGraph#testAPIGetFollowersWithoutSessionUnauthorized" ],
+    "predecessors" : [ ]
+  }, {
+    "id" : "tjobb",
+    "stage" : 0,
+    "resources" : [ "home-timeline" ],
+    "tests" : [ "TestApiTimeline#testAPIHomeTimelineBadRequest" ],
+    "predecessors" : [ ]
+  }, {
+    "id" : "tjobc",
+    "stage" : 0,
+    "resources" : [ "home-timeline", "post", "social-graph", "user" ],
+    "tests" : [ "TestApiTimeline#testAPIHomeTimelineExcludesOwnPosts", "TestApiTimeline#testAPIHomeTimelineMergesTwoAuthorsNewestFirst", "TestApiTimeline#testAPIHomeTimelinePagination", "TestApiTimeline#testAPIHomeTimelineShowsFollowedUserPost", "TestApiTimeline#testAPIHomeTimelineStopsAfterUnfollow" ],
+    "predecessors" : [ ]
+  }, {
+    "id" : "tjobd",
+    "stage" : 0,
+    "resources" : [ "user-timeline" ],
+    "tests" : [ "TestApiPosts#testAPIReadUserTimelineBadRequest" ],
+    "predecessors" : [ ]
+  }, {
+    "id" : "tjobe",
+    "stage" : 0,
+    "resources" : [ "frontend", "post", "user", "user-timeline", "web-browser" ],
+    "tests" : [ "TestPosts#testComposePostAppearsInTimeline", "TestPosts#testComposePostWithMentionShowsProfileLink" ],
+    "predecessors" : [ ]
+  }, {
+    "id" : "tjobf",
+    "stage" : 0,
+    "resources" : [ "frontend", "social-graph", "user", "web-browser" ],
+    "tests" : [ "TestSocialGraph#testFollowAndUnfollow" ],
+    "predecessors" : [ ]
+  }, {
+    "id" : "tjobg",
+    "stage" : 0,
+    "resources" : [ "frontend", "user", "web-browser" ],
+    "tests" : [ "TestLogin#testLogin", "TestLogin#testLoginWithWrongPasswordDoesNotReachMainPage", "TestNavigation#testNavigation", "TestLogin#testRegister", "TestPosts#testVisibilityComposeForm" ],
+    "predecessors" : [ ]
+  }, {
+    "id" : "tjobh",
+    "stage" : 1,
+    "resources" : [ "post", "social-graph", "user", "user-timeline" ],
+    "tests" : [ "TestApiPosts#testAPIComposePostShortensUrls", "TestApiPosts#testAPIComposePostWithEmptyTextBadRequest", "TestApiPosts#testAPIComposePostWithMediaAttachesMedia", "TestApiPosts#testAPIComposePostWithMismatchedMediaIsSilentlyDropped", "TestApiPosts#testAPIUserTimelinePagination", "TestApiPosts#testAPIUserTimelinePaginationBeyondSizeIsEmpty" ],
+    "predecessors" : [ "tjobf" ]
+  }, {
+    "id" : "tjobi",
+    "stage" : 1,
+    "resources" : [ "post", "user", "user-timeline" ],
+    "tests" : [ "TestApiPosts#testAPIComposePostWithMentionPopulatesUserMentions", "TestApiPosts#testAPIReadUserTimeline", "TestApiPosts#testAPIReadUserTimelineWithoutPostsIsEmpty" ],
+    "predecessors" : [ "tjobc" ]
+  }, {
+    "id" : "tjobj",
+    "stage" : 1,
+    "resources" : [ "post", "social-graph", "user" ],
+    "tests" : [ "TestApiPosts#testAPIComposePost" ],
+    "predecessors" : [ "tjobg" ]
+  }, {
+    "id" : "tjobk",
+    "stage" : 1,
+    "resources" : [ "home-timeline", "user" ],
+    "tests" : [ "TestApiTimeline#testAPIHomeTimelineReturnsArray" ],
+    "predecessors" : [ "tjobe" ]
+  }, {
+    "id" : "tjobl",
+    "stage" : 2,
+    "resources" : [ "social-graph", "user" ],
+    "tests" : [ "TestApiSocialGraph#testAPIFollowSelf", "TestApiSocialGraph#testAPIFollowTwiceIsIdempotent", "TestApiSocialGraph#testAPIFollowUnknownUserFails", "TestApiSocialGraph#testAPIFollowUser", "TestApiSocialGraph#testAPIGetFolloweesWithToken", "TestApiSocialGraph#testAPIGetFolloweesWithoutFolloweesReturnsServerError", "TestApiSocialGraph#testAPIGetFollowers", "TestApiSocialGraph#testAPIUnfollowNotFollowedIsIdempotent", "TestApiSocialGraph#testAPIUnfollowRemovesFollowee" ],
+    "predecessors" : [ "tjobk" ]
+  }, {
+    "id" : "tjobm",
+    "stage" : 2,
+    "resources" : [ "user" ],
+    "tests" : [ "TestApiUsers#testAPILoginUnknownUserIssuesNoToken", "TestApiUsers#testAPIRegisterMissingField" ],
+    "predecessors" : [ "tjobh" ]
+  }, {
+    "id" : "tjobn",
+    "stage" : 2,
+    "resources" : [ "user" ],
+    "tests" : [ "TestApiUsers#testAPILoginUser", "TestApiUsers#testAPILoginWrongPasswordStatus", "TestApiUsers#testAPIRegisterDuplicateUsername", "TestApiUsers#testAPIRegisterUser", "TestApiUsers#testLoginWrongPassword" ],
+    "predecessors" : [ "tjobj" ]
+  } ]
+}

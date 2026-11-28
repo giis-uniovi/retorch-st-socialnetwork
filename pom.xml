@@ -76,11 +76,6 @@
 			<version>${retorch-tool.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>io.github.giis-uniovi</groupId>
-			<artifactId>retorch-orchestration</artifactId>
-			<version>${retorch-tool.version}</version>
-		</dependency>
-		<dependency>
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpclient</artifactId>
 			<version>4.5.14</version>

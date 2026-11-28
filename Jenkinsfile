@@ -171,10 +171,19 @@ pipeline {
           sh '$SCRIPTS_FOLDER/coilifecycles/coi-teardown.sh'
       } // EndStepsTearDownInf
     } // EndStageTearDown
+    stage('Usage-Profile') {
+      steps {
+          catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+              sh '$SCRIPTS_FOLDER/generateusageprofile.sh'
+          }
+      } // EndStepsUsageProfile
+    } // EndStageUsageProfile
 } // EndStagesPipeline
 post {
     always {
         archiveArtifacts artifacts: 'artifacts/*.csv', onlyIfSuccessful: true
+        archiveArtifacts artifacts: 'artifacts/usageprofile/*.html', allowEmptyArchive: true
+        publishHTML(target: [reportDir: 'artifacts/usageprofile', reportFiles: 'usageprofile.html', reportName: 'RETORCH Usage Profile', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
         archiveArtifacts artifacts: 'target/testlogs/**/*.*', onlyIfSuccessful: false
         archiveArtifacts artifacts: 'target/containerlogs/**/*.*', onlyIfSuccessful: false
     }// EndAlways
