@@ -1,110 +1,75 @@
 # CLAUDE.md — retorch-st-socialnetwork
 
-This repository is a **demonstrator of the [RETORCH framework](https://github.com/giis-uniovi/retorch)**
-(resource-aware E2E test orchestration). It contains three cooperating layers:
+Demonstrator of the [RETORCH](https://github.com/giis-uniovi/retorch) framework with three cooperating parts:
 
-1. **A Java E2E test suite** (`src/test`) — Selenium UI tests + HTTP API tests against the social network.
-2. **The System Under Test (SUT)** (`sut/`) — a fork of DeathStarBench Social Network: C++ (C++23)
-   Thrift microservices behind an OpenResty gateway. **See [`sut/CLAUDE.md`](sut/CLAUDE.md)** for the SUT's
-   architecture, endpoint catalog, and known quirks — do not duplicate that knowledge here.
-3. **RETORCH orchestration** (`.retorch/`, `Jenkinsfile`, `orchestrate.ps1`) — generates and runs the CI
-   pipeline that schedules tests into parallel TJobs based on the resources each test declares.
+1. **The E2E suite** (`src/test`): Selenium UI tests and HTTP API tests.
+2. **The SUT** (`sut/`): a fork of DeathStarBench Social Network (C++23 Thrift microservices behind an OpenResty gateway). Its architecture,
+   endpoints and known quirks are in [`sut/CLAUDE.md`](sut/CLAUDE.md): do not duplicate them here.
+3. **RETORCH orchestration** (`.retorch/`, `Jenkinsfile`, `orchestrate.ps1`): the CI pipeline that schedules the tests into parallel TJobs.
 
----
+See `README.md` for the user documentation.
 
-## 🚨 IRON RULE — SUT changes require a full rebuild + redeploy + test run
+## Iron rule: changes under `sut/` need rebuild, redeploy and a green run
 
-**If you change ANYTHING under `sut/` (C++ sources, headers, CMakeLists, Dockerfiles, nginx/Lua scripts,
-HTML/JS pages, configs, thrift definitions, scripts...), the task is NOT done until you have:**
+If you change anything under `sut/` (C++, headers, CMake, Dockerfiles, nginx/Lua, HTML/JS, configs, thrift), the task is not done until you have:
 
-1. **Rebuilt the SUT Docker images** — `docker compose -p <project> build` (the microservices image compiles
-   all C++ services from source; a code change that is never compiled is unverified).
-2. **Redeployed the stack** — `docker compose -p <project> up -d` (or `./deploy.ps1|sh`) and confirmed
-   `http://localhost:8080` serves the "Death Star" page.
-3. **Run the full E2E test suite** — `mvn test` — and confirmed it is **green**.
+1. rebuilt the images (`docker compose -p <project> build`; C++ is compiled inside the image),
+2. redeployed (`./deploy.sh` / `.\deploy.ps1`) and confirmed `http://localhost:8080` serves the "Death Star" page,
+3. run the whole suite (`mvn test`) and seen it green.
 
-No exceptions. A change that "only touches a comment", "only touches HTML", or "compiles locally" still goes
-through all three steps. Static pages and Lua scripts are baked into/mounted by the gateway image; C++ is
-compiled inside the image; nothing under `sut/` is hot-reloaded reliably.
+No exceptions, not even for comment or HTML changes: nothing under `sut/` is reliably hot-reloaded.
 
----
+## RETORCH rules (do not break)
 
-## Repository layout
+- Every test method carries `@AccessMode(...)` annotations (`giis.retorch.annotations`) that declare the logical resources it uses and
+  how (`READONLY`/`READWRITE`, concurrency, sharing). The TJob schedule of the `Jenkinsfile` is **generated from them**.
+  - Never drop or alter existing `@AccessMode` annotations when refactoring.
+  - Never rename test classes or methods: the `Jenkinsfile` references them as `Class#method`.
+  - A new test method needs sensible `@AccessMode` values (copy a sibling) and is only run by CI after regenerating the pipeline.
+- `Jenkinsfile`, `.retorch/scripts/`, `.retorch/envfiles/` (except `local.env`), `.retorch/executionplan.json` and the resource model in
+  `.retorch/configurations/*SystemResources.json` are **generated** by `orchestrate.ps1` (it needs the
+  `retorch-orchestration-*-standalone.jar` of the RETORCH tool in the repository root). Do not edit them by hand; put SUT-specific
+  commands in `.retorch/customscriptscode/` and settings in `.retorch/configurations/retorchCI.properties`.
+- Only `retorch-annotations` is a dependency of the tests; the orchestration code is never part of this project.
+- `profiling=true` in `retorchCI.properties` makes the pipeline measure the resources of every TJob and publish
+  `artifacts/usageprofile/usageprofile.html`. `.retorch/customscriptscode/custom-usageprofile` temporarily builds the profiling tool from
+  source; delete it when a release publishes the jar.
+
+## Layout
 
 | Path | What it is |
-|------|------------|
-| `src/test/java/giis/socialnetwork/e2e/functional/` | The E2E suite: `tests/` (Selenium UI), `tests/api/` (HTTP API), `pages/` (page objects), `common/` (base classes), `utils/` (waits/clicks) |
-| `src/test/resources/test.properties` | `BROWSER_USER=CHROME`, `LOCALHOST_URL=http://localhost:8080` (fallback SUT URL) |
-| `sut/` | The SUT (DeathStarBench fork). **Read [`sut/CLAUDE.md`](sut/CLAUDE.md)** |
-| `docker-compose.yml` | Whole SUT stack: 28 services, external network `jenkins_network`, container names prefixed `${TJOB_NAME}-`, only `nginx-thrift` publishes a host port (`${frontend_port}:8080`) |
-| `deploy.ps1` / `deploy.sh` | Local deploy: project `default`, port 8080 (`-Port`/`--port`), builds (skip with `-NoBuild`/`--no-build`), waits for "Death Star"; `-Down`/`--down` tears down |
-| `.retorch/envfiles/` | `local.env` + per-TJob env files `tjoba.env`…`tjobl.env` (each sets `TJOB_NAME`/`frontend_port` so parallel stacks don't collide) |
-| `.retorch/configurations/` | `SocialNetworkSystemResources.json` (the RETORCH resource model: `web-browser`, `frontend`, `user`, `post`, `social-graph`, `home-timeline`, `user-timeline`) and `retorchCI.properties` |
-| `.retorch/scripts/` | CI lifecycle scripts (`coilifecycles/`, `tjoblifecycles/`, log/wait helpers) invoked by the Jenkinsfile |
-| `Jenkinsfile` | **Generated by RETORCH** (`orchestrate.ps1`) — 12 parallel TJobs (tjoba–tjobl) in 3 sequential stages, each with its own compose stack |
-| `orchestrate.ps1` + `retorch-orchestration-*-standalone.jar` | Regenerates the Jenkinsfile from the `@AccessMode` annotations + resource model |
-| `sonar-project.properties` | SonarCloud config (`my:retorch-st-socialnetwork`) — **scans `sut/` (sources) and `src/test` (tests)**, with `third_party/gen-*/wrk2/...` excluded |
-| `pom.xml` | `io.github.giis-uniovi:retorch-st-socialnetwork` — see build details below |
+|---|---|
+| `src/test/java/giis/socialnetwork/e2e/functional/` | `tests/` (UI), `tests/api/`, `pages/` (page objects), `common/` (base classes), `dto/`, `utils/` (waits, clicks) |
+| `src/test/resources/test.properties` | `BROWSER_USER`, `LOCALHOST_URL=http://localhost:8080` |
+| `docker-compose.yml` | The whole SUT: external network `jenkins_network`, containers prefixed `${TJOB_NAME}-`, only `nginx-thrift` publishes a port (`${frontend_port}:8080`) |
+| `deploy.sh` / `deploy.ps1` | Local deployment (`--port`, `--no-build`, `--down`); project `default`, port 8080 |
+| `.retorch/` | Generated pipeline files, `envfiles/` (`local.env` + one per TJob), `customscriptscode/`, `configurations/` |
+| `orchestrate.ps1` + `Jenkinsfile` | Regenerate / the generated pipeline: 14 TJobs (`tjoba`…`tjobn`) in 3 stages |
+| `sonar-project.properties` | SonarCloud (`my:retorch-st-socialnetwork`): scans `sut/` and `src/test` |
 
----
+RETORCH resources: `web-browser`, `frontend`, `user`, `post`, `social-graph`, `home-timeline`, `user-timeline`.
 
-## Building & running the test suite
+## Build and test
 
-```bash
-mvn test                       # full suite against http://localhost:8080 (SUT must be deployed)
-mvn test -Dtest=TestApiUsers   # a single class
-```
+- Java 8 source level (no `var`, records or `List.of`), JUnit Jupiter, Selenium 4, Selema (owns the WebDriver lifecycle and the screenshots /
+  video on failure: do not add your own driver manager or watcher), Gson, Apache HttpClient 4.x, SLF4J / Log4j2.
+- `mvn test` (or `-Dtest=TestApiUsers`) against a deployed SUT. Target: `SUT_URL` property → `SUT_URL` env var → `LOCALHOST_URL`.
+  `SELENOID_PRESENT` switches Selenium to the remote hub (`http://selenium-hub:4444/wd/hub`).
+- Surefire has `testFailureIgnore=true`: the build stays green when tests fail, so read the `Tests run / Failures / Errors` totals.
 
-- **Java 8** (`maven.compiler.source/target=1.8`) — test code must be Java-8 compatible (no records, no `var`).
-- **JUnit Jupiter 6** (Jupiter-style `@Test`/`Assertions`), **Selenium 4**, **Selema**
-  (`io.github.javiertuya:selema` — owns the WebDriver lifecycle and screenshots/video on failure; do not add a
-  custom driver manager or TestWatcher), **Gson**, **Apache HttpClient 4.x**, **SLF4J/log4j2**.
-- Surefire: `testFailureIgnore=true` (build stays SUCCESS on test failures — always read the
-  `Tests run: X, Failures: Y, Errors: Z` totals, not the build result), build dir is `target/${TJOB_NAME}`.
-- **Config resolution** (both base classes): `SUT_URL` system property → `SUT_URL` env var →
-  `LOCALHOST_URL` from `test.properties`.
-- `SELENOID_PRESENT` env var switches Selenium from local Chrome to a remote hub
-  (`http://selenium-hub:4444/wd/hub`) with video + failure watermark.
-- Maven profiles: `local-execution` auto-activates when `-DTJOB_NAME` is absent (sets `TJOB_NAME=local`);
-  `publish-github` / `publish-maven` are release-only.
-- CI invocation shape: `mvn test -Dtest="<Class#method>,..." -DTJOB_NAME=<tjob> -DSUT_URL=<url>`.
+## CI
 
-## Deploying the SUT locally
+- Jenkins, agent label `xretorch-agent`. Every TJob deploys its **own** copy of the SUT (`--env-file .retorch/envfiles/<tjob>.env
+  -p <tjob>`) on the external network `jenkins_network`, runs its tests and tears it down; the TJobs of a stage run in parallel.
+- The TJob runs `mvn test -Dtest="<Class#method>,..." -DTJOB_NAME=<tjob> -DSUT_URL=<url>`.
+- `pom.xml` builds into `target/${TJOB_NAME}` so parallel TJobs never share compiled classes or reports (profile `local-execution` sets
+  `TJOB_NAME=local` when the property is absent).
+- `.github/workflows/test.yml` only triggers the SonarCloud scan.
 
-```powershell
-.\deploy.ps1            # build + up + wait (project "default", port 8080)
-.\deploy.ps1 -Down      # tear down
-```
+## Test conventions
 
-The compose stack builds **one** C++ image (`sut/Dockerfile`, two-stage: ubuntu:26.04 + GCC 14 / C++23
-builder → slim non-root runtime) shared by all app services — each compose service selects its binary via
-`entrypoint:`. The gateway (`nginx-thrift`) is built from `sut/docker/openresty-thrift/xenial/Dockerfile`.
-Requires Docker Desktop running and the external network `jenkins_network` (the scripts create it).
-
----
-
-## RETORCH orchestration & CI — rules for editing tests
-
-- **Every test method carries `@AccessMode(...)` annotations** (`giis.retorch.annotations`) declaring which
-  logical resources it uses (`user`, `post`, `social-graph`, `home-timeline`, `user-timeline`, `frontend`,
-  `web-browser`) and how (`READONLY`/`READWRITE`, concurrency, sharing). **These are load-bearing**: the
-  Jenkinsfile's TJob schedule is generated from them.
-  - **Never drop or alter existing `@AccessMode` annotations during refactors.**
-  - **Never rename existing test classes or methods** — the Jenkinsfile references them as `Class#method`.
-  - New test methods must declare a sensible `@AccessMode` set (copy the pattern of sibling tests) and are
-    only picked up by CI after regenerating the Jenkinsfile with `orchestrate.ps1`.
-- CI runs on Jenkins (agent label `xretorch-agent`); GitHub Actions only triggers the SonarCloud scan.
-- Each CI TJob deploys its **own** full compose stack (`--env-file .retorch/envfiles/<tjob>.env -p <tjob>`),
-  runs its assigned test subset, and tears down.
-
-## Test-suite conventions
-
-- Unique test users are derived from `System.currentTimeMillis()`; API fixtures go through
-  `BaseApiClass.createUserWithName(label)`, UI fixtures through the `BaseLoggedClass` user helpers.
-- The SUT is **eventually consistent** on the home-timeline (async fan-out): API tests poll
-  (`TestApiTimeline`), UI tests retry-refresh (`Waiter.waitForPostText`). Don't replace polling with sleeps.
-- Respect the documented SUT quirks (see `sut/CLAUDE.md` → "Known bugs & quirks"): arrange **≥1 follower
-  before composing** (empty-`ZADD` 500), tolerate `{}` instead of `[]` for an empty home-timeline, and don't
-  re-navigate right after follow/unfollow form submits (redirect race).
-- Selenium UI tests have a rare Chrome flake on the signup navigation; on a single unexpected UI failure,
-  re-run that class before suspecting a regression.
+- Users are unique (`System.currentTimeMillis()`); API fixtures use `BaseApiClass.createUserWithName(label)`, UI fixtures the `BaseLoggedClass` helpers.
+- The home timeline is eventually consistent (async fan-out): API tests poll (`TestApiTimeline`), UI tests refresh-retry (`Waiter.waitForPostText`). Never replace polling with sleeps.
+- Respect the SUT quirks of `sut/CLAUDE.md`: have at least one follower before composing (empty `ZADD` gives a 500), tolerate `{}` for an empty
+  home timeline, and do not navigate right after a follow / unfollow submit (redirect race).
+- A rare Chrome flake on the signup navigation exists: re-run the class before suspecting a regression.
