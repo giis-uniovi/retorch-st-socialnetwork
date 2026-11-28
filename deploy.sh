@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# deploy-local.sh — Deploy or tear down the DeathStarBench Social Network SUT locally
+# deploy.sh — Deploy or tear down the DeathStarBench Social Network SUT locally
 #
 # Usage:
-#   ./deploy-local.sh                — start on default port 8080
-#   ./deploy-local.sh --port 9090    — start on a custom port
-#   ./deploy-local.sh --down         — tear down the running deployment
-#   ./deploy-local.sh --down --port 9090
+#   ./deploy.sh                — start on default port 8080
+#   ./deploy.sh --port 9090    — start on a custom port
+#   ./deploy.sh --no-build     — skip the image build
+#   ./deploy.sh --down         — tear down the running deployment
+#   ./deploy.sh --down --port 9090
 
 set -euo pipefail
 
@@ -16,6 +17,7 @@ MAX_WAIT_SECS=300
 POLL_INTERVAL=5
 PORT=8080
 DOWN=false
+SKIP_BUILD=false
 
 step() { echo "[>] $*"; }
 ok()   { echo "[+] $*"; }
@@ -25,8 +27,9 @@ fail() { echo "[!] $*" >&2; exit 1; }
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --down)   DOWN=true; shift ;;
+        --no-build) SKIP_BUILD=true; shift ;;
         --port)   PORT="$2"; shift 2 ;;
-        *) fail "Unknown argument: $1. Valid options: --down, --port <number>" ;;
+        *) fail "Unknown argument: $1. Valid options: --down, --no-build, --port <number>" ;;
     esac
 done
 
@@ -58,9 +61,13 @@ else
 fi
 
 # ── Build images ────────────────────────────────────────────────────────────────
-step "Building images from sut/ (this is slow on the first run)..."
-docker compose -f "$COMPOSE_FILE" --ansi never -p "$TJOB_NAME" build
-ok "Images built."
+if [[ "$SKIP_BUILD" == true ]]; then
+    step "Skipping the image build (--no-build)"
+else
+    step "Building images from sut/ (this is slow on the first run)..."
+    docker compose -f "$COMPOSE_FILE" --ansi never -p "$TJOB_NAME" build
+    ok "Images built."
+fi
 
 # ── Start containers ──────────────────────────────────────────────────────────
 step "Starting containers (project: '$TJOB_NAME', nginx port: $PORT)..."

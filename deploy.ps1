@@ -6,12 +6,16 @@
 .PARAMETER Port
     Host port nginx-thrift listens on (default: 8080).
 .EXAMPLE
-    .\deploy-local.ps1
-    .\deploy-local.ps1 -Port 9090
-    .\deploy-local.ps1 -Down
+    .\deploy.ps1
+    .\deploy.ps1 -Port 9090
+    .\deploy.ps1 -NoBuild
+    .\deploy.ps1 -Down
+.PARAMETER NoBuild
+    Skip the image build.
 #>
 param(
     [switch]$Down,
+    [switch]$NoBuild,
     [int]$Port = 8080
 )
 
@@ -67,10 +71,14 @@ if ($existingNetworks -notcontains $NETWORK_NAME) {
 }
 
 # ── Build images ────────────────────────────────────────────────────────────────
-Write-Step "Building images from sut/ (this is slow on the first run)..."
-docker compose -f $COMPOSE_FILE --ansi never -p $TJOB_NAME build
-if ($LASTEXITCODE -ne 0) { Write-Fail "docker compose build failed." }
-Write-OK "Images built."
+if ($NoBuild) {
+    Write-Step "Skipping the image build (-NoBuild)"
+} else {
+    Write-Step "Building images from sut/ (this is slow on the first run)..."
+    docker compose -f $COMPOSE_FILE --ansi never -p $TJOB_NAME build
+    if ($LASTEXITCODE -ne 0) { Write-Fail "docker compose build failed." }
+    Write-OK "Images built."
+}
 
 # ── Start containers ──────────────────────────────────────────────────────────
 Write-Step "Starting containers (project: '$TJOB_NAME', nginx port: $Port)..."

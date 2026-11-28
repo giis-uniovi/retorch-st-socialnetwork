@@ -19,7 +19,7 @@ HTML/JS pages, configs, thrift definitions, scripts...), the task is NOT done un
 
 1. **Rebuilt the SUT Docker images** — `docker compose -p <project> build` (the microservices image compiles
    all C++ services from source; a code change that is never compiled is unverified).
-2. **Redeployed the stack** — `docker compose -p <project> up -d` (or `./deploy-local.ps1|sh`) and confirmed
+2. **Redeployed the stack** — `docker compose -p <project> up -d` (or `./deploy.ps1|sh`) and confirmed
    `http://localhost:8080` serves the "Death Star" page.
 3. **Run the full E2E test suite** — `mvn test` — and confirmed it is **green**.
 
@@ -37,8 +37,7 @@ compiled inside the image; nothing under `sut/` is hot-reloaded reliably.
 | `src/test/resources/test.properties` | `BROWSER_USER=CHROME`, `LOCALHOST_URL=http://localhost:8080` (fallback SUT URL) |
 | `sut/` | The SUT (DeathStarBench fork). **Read [`sut/CLAUDE.md`](sut/CLAUDE.md)** |
 | `docker-compose.yml` | Whole SUT stack: 28 services, external network `jenkins_network`, container names prefixed `${TJOB_NAME}-`, only `nginx-thrift` publishes a host port (`${frontend_port}:8080`) |
-| `deploy-local.ps1` / `deploy-local.sh` | Simple local deploy: project `default`, port 8080, waits for "Death Star", `-Down`/`--down` tears down |
-| `redeploy-local.ps1` / `redeploy-local.sh` | Env-file-driven redeploy: loads `.retorch/envfiles/local.env`, project `local`, `-NoBuild`/`--no-build` skips image build |
+| `deploy.ps1` / `deploy.sh` | Local deploy: project `default`, port 8080 (`-Port`/`--port`), builds (skip with `-NoBuild`/`--no-build`), waits for "Death Star"; `-Down`/`--down` tears down |
 | `.retorch/envfiles/` | `local.env` + per-TJob env files `tjoba.env`…`tjobl.env` (each sets `TJOB_NAME`/`frontend_port` so parallel stacks don't collide) |
 | `.retorch/configurations/` | `SocialNetworkSystemResources.json` (the RETORCH resource model: `web-browser`, `frontend`, `user`, `post`, `social-graph`, `home-timeline`, `user-timeline`) and `retorchCI.properties` |
 | `.retorch/scripts/` | CI lifecycle scripts (`coilifecycles/`, `tjoblifecycles/`, log/wait helpers) invoked by the Jenkinsfile |
@@ -73,8 +72,8 @@ mvn test -Dtest=TestApiUsers   # a single class
 ## Deploying the SUT locally
 
 ```powershell
-.\deploy-local.ps1            # build + up + wait (project "default", port 8080)
-.\deploy-local.ps1 -Down      # tear down
+.\deploy.ps1            # build + up + wait (project "default", port 8080)
+.\deploy.ps1 -Down      # tear down
 ```
 
 The compose stack builds **one** C++ image (`sut/Dockerfile`, two-stage: ubuntu:26.04 + GCC 14 / C++23
